@@ -133,7 +133,7 @@ func main() {
 			}
 			location := *parsedRedirectURI
 			location.RawQuery = url.Values{
-				"access_token": {apiKey},
+				"access_token": {name + ":" + apiKey},
 				"token_type":   {"bearer"},
 				"state":        {state},
 			}.Encode()
