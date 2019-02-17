@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -15,11 +16,27 @@ func main() {
 		loginPath = "/smartlights/login"
 		tokenPath = "/smartlights/token"
 	)
+	googleAPIKey := os.Getenv("GOOGLE_API_KEY")
+	if googleAPIKey == "" {
+		log.Fatalf("missing GOOGLE_API_KEY")
+	}
 	oauthServer, err := oauthServerFromEnv(loginPath, tokenPath)
 	if err != nil {
 		log.Fatalf("error setting up oauth server: %s", err)
 	}
+	user := func(users map[string][]byte) string {
+		for u := range users {
+			return u
+		}
+		return ""
+	}(oauthServer.userPasswordHashes)
+
 	var tokenParser authTokenParser = oauthServer
+	syncChan := func(ctx context.Context, googleAPIKey, user string) chan<- struct{} {
+		res := make(chan struct{}, 16)
+		go sendSyncRequests(ctx, http.DefaultClient, res, googleAPIKey, user)
+		return res
+	}(context.TODO(), googleAPIKey, user)
 
 	mux := http.NewServeMux()
 
@@ -90,7 +107,11 @@ func main() {
 		}
 	})
 
-	log.Println("setup successful, starting to listen")
+	log.Println("setup successful, starting to listen & requesting sync")
+	go func(syncChan chan<- struct{}) {
+		time.Sleep(time.Second) // allow server to finish starting
+		syncChan <- struct{}{}
+	}(syncChan)
 	err = http.ListenAndServe("127.0.0.1:18917", mux)
 	log.Println("finished serving with err =", err)
 }
