@@ -213,6 +213,7 @@ func (s *oauthServer) serveLogin(rw http.ResponseWriter, r *http.Request) {
 		}.Encode()
 		rw.Header().Set("Location", location.String())
 		rw.WriteHeader(http.StatusFound)
+		log.Printf("successful login by %q for %q", name, s.clientID)
 
 	default:
 		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
@@ -289,7 +290,9 @@ func (s *oauthServer) serveToken(rw http.ResponseWriter, r *http.Request) {
 			}
 			if err := json.NewEncoder(rw).Encode(&resp); err != nil {
 				log.Printf("token authorization_code writing response: %s", err)
+				return
 			}
+			log.Printf("token authorization_code successful response for %q", clientID)
 		case "refresh_token":
 			raw := r.PostForm.Get("refresh_token")
 			if raw == "" {
@@ -325,9 +328,11 @@ func (s *oauthServer) serveToken(rw http.ResponseWriter, r *http.Request) {
 			}
 			if err := json.NewEncoder(rw).Encode(&resp); err != nil {
 				log.Printf("token refresh_token writing response: %s", err)
+				return
 			}
+			log.Printf("token refresh_token successful response for %q", clientID)
 		default:
-			log.Printf("token called with invalid grant_type %q", grantType)
+			log.Printf("token called with invalid grant_type %q for %q", grantType, clientID)
 			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}

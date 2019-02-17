@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -44,9 +45,49 @@ func main() {
 			http.Error(rw, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
 		}
-		log.Printf("authorized call by %q on behalf of %q", token.ClientID, token.User)
-		_, _ = io.Copy(os.Stderr, r.Body) // TODO
-		http.Error(rw, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
+		if r.Method != http.MethodPost {
+			log.Printf("fulfillment called with invalid method %q", r.Method)
+			http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		var req request
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			log.Printf("fulfillment failed to parse body: %s", err)
+			http.Error(rw, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if len(req.Inputs) != 1 {
+			log.Printf("fulfillment invalid input count: %v", req.Inputs)
+			http.Error(rw, "invalid input count", http.StatusUnprocessableEntity)
+			return
+		}
+		input := &req.Inputs[0]
+		switch input.Intent {
+		case intentSync:
+			resp := response{
+				RequestID: req.RequestID,
+				Payload: responsePayloadSync{
+					AgentUserID: token.User,
+					Devices:     devices,
+				},
+			}
+			if err := json.NewEncoder(io.MultiWriter(rw, os.Stderr)).Encode(&resp); err != nil {
+				log.Printf("fulfillment failed to send response: %s", err)
+			}
+			log.Printf("fulfillment sync successful")
+		case intentDisconnect:
+			log.Printf("TODO implement disconnect")
+			http.Error(rw, "TODO implement disconnect", http.StatusNotImplemented)
+		case intentExecute:
+			log.Printf("TODO implement execute")
+			http.Error(rw, "TODO implement execute", http.StatusNotImplemented)
+		case intentQuery:
+			log.Printf("TODO implement query")
+			http.Error(rw, "TODO implement query", http.StatusNotImplemented)
+		default:
+			log.Printf("fulfillment unsupported intent %q", input.Intent)
+			http.Error(rw, "unsupported intent", http.StatusNotImplemented)
+		}
 	})
 
 	log.Println("setup successful, starting to listen")
