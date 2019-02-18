@@ -7,10 +7,15 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/mrwonko/smartlights/config"
 
 	"cloud.google.com/go/pubsub"
+)
+
+const (
+	discardMessagesAfter = time.Minute
 )
 
 type pubsubClient struct {
@@ -67,6 +72,11 @@ func newPubsubClient(ctx context.Context, pi int) (_ *pubsubClient, finalErr err
 
 func (pc *pubsubClient) ReceiveExecute(ctx context.Context, f func(ctx context.Context, msg *config.ExecuteMessage)) error {
 	return pc.executeSubscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+		defer msg.Ack()
+		if msg.PublishTime.Add(discardMessagesAfter).Before(time.Now()) {
+			log.Printf("skipping message due to age: %v", msg)
+			return
+		}
 		data := config.ExecuteMessage{}
 		if err := json.Unmarshal(msg.Data, &data); err != nil {
 			log.Printf("unmarshaling %q message: %s", pc.executeSubscription, err)
