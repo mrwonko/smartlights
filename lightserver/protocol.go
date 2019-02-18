@@ -142,6 +142,9 @@ var devices = func() []responsePayloadSyncDevice {
 		d.Type = typeLight
 		d.Traits = []deviceTrait{traitOnOff}
 		d.WillReportState = false // TODO report state
+		d.Attributes = map[string]interface{}{
+			"commandOnlyOnOff": true, // TODO report state
+		}
 	}
 	return res
 }()

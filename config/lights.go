@@ -14,7 +14,7 @@ const (
 type Light struct {
 	Name string
 	Pi   int
-	GPIO int
+	GPIO uint8
 }
 
 var Lights = map[ID]*Light{
@@ -49,3 +49,11 @@ var Lights = map[ID]*Light{
 		GPIO: 21,
 	},
 }
+
+var Pis = func(lights map[ID]*Light) map[int]struct{} {
+	res := map[int]struct{}{}
+	for _, l := range lights {
+		res[l.Pi] = struct{}{}
+	}
+	return res
+}(Lights)

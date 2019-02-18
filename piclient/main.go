@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mrwonko/smartlights/config"
+
 	rpio "github.com/stianeikeland/go-rpio/v4"
 )
 
@@ -19,6 +21,9 @@ const (
 )
 
 func main() {
+	const (
+		pi = 0
+	)
 	err := rpio.Open()
 	if err != nil {
 		log.Fatalf("failed to init go-rpio: %s", err)
@@ -28,9 +33,6 @@ func main() {
 	red.Output()
 	green.Output()
 	blue.Output()
-	redBrightness := make(chan uint8, 8)
-	greenBrightness := make(chan uint8, 8)
-	blueBrightness := make(chan uint8, 8)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	sigChan := make(chan os.Signal, 2)
@@ -40,28 +42,54 @@ func main() {
 		cancel()
 	}()
 
+	pc, err := newPubsubClient(ctx, pi)
+	if err != nil {
+		log.Fatalf("failed to create pubsub client: %s", err)
+	}
+	defer func(pc *pubsubClient) {
+		if err := pc.Close(); err != nil {
+			log.Printf("closing pubsub client: %s", err)
+		}
+	}(pc)
+
 	var wg sync.WaitGroup
-	wg.Add(3)
-	go func() {
-		pwm(ctx, red, redBrightness)
+	chans := map[uint8]chan<- uint8{}
+	for _, l := range config.Lights {
+		if l.Pi == pi {
+			c := make(chan uint8, 8)
+			chans[l.GPIO] = c
+			pin := rpio.Pin(l.GPIO)
+			pin.Output()
+			wg.Add(1)
+			go func(ctx context.Context, pin rpio.Pin, c <-chan uint8) {
+				pwm(ctx, pin, c)
+				wg.Done()
+			}(ctx, pin, c)
+		}
+	}
+	wg.Add(1)
+	go func(ctx context.Context, chans map[uint8]chan<- uint8) {
+		pc.ReceiveExecute(ctx, func(ctx context.Context, msg *config.ExecuteMessage) {
+			c := chans[msg.GPIO]
+			if c == nil {
+				log.Printf("got message for unknown gpio: %v", msg)
+				return
+			}
+			if msg.On {
+				c <- 255
+			} else {
+				c <- 0
+			}
+			log.Printf("received message %v", msg)
+		})
 		wg.Done()
-	}()
-	go func() {
-		pwm(ctx, green, greenBrightness)
-		wg.Done()
-	}()
-	go func() {
-		pwm(ctx, blue, blueBrightness)
-		wg.Done()
-	}()
-	redBrightness <- 255
-	greenBrightness <- 0
-	blueBrightness <- 255
+	}(ctx, chans)
+	log.Println("started listening for messages")
 	<-ctx.Done()
 	wg.Wait()
-	red.Low()
-	green.Low()
-	blue.Low()
+	for gpio := range chans {
+		rpio.Pin(gpio).Low()
+	}
 }
 
 func pwm(ctx context.Context, pin rpio.Pin, cmdChan <-chan uint8) {
