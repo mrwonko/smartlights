@@ -9,6 +9,8 @@ const (
 	idBar
 	idSofa
 	idUV
+	idShoe
+	idLP
 )
 
 type Light struct {
@@ -47,6 +49,16 @@ var Lights = map[ID]*Light{
 		Name: "UV",
 		Pi:   0,
 		GPIO: 21,
+	},
+	idShoe: {
+		Name: "Shoe Light",
+		Pi:   0,
+		GPIO: 12,
+	},
+	idLP: {
+		Name: "LP Light",
+		Pi:   0,
+		GPIO: 26,
 	},
 }
 
