@@ -8,14 +8,16 @@ import (
 	"log"
 	"os"
 
-	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/common"
+	"github.com/mrwonko/smartlights/internal/config"
 
 	"cloud.google.com/go/pubsub"
 )
 
 type pubsubClient struct {
-	client        *pubsub.Client
-	executeTopics map[int]*pubsub.Topic
+	client             *pubsub.Client
+	executeTopics      map[int]*pubsub.Topic
+	queryRequestTopics map[int]*pubsub.Topic
 }
 
 func newPubsubClient(ctx context.Context) (_ *pubsubClient, finalErr error) {
@@ -35,23 +37,32 @@ func newPubsubClient(ctx context.Context) (_ *pubsubClient, finalErr error) {
 		}
 	}()
 	res := pubsubClient{
-		client:        cl,
-		executeTopics: make(map[int]*pubsub.Topic, len(config.Pis)),
+		client:             cl,
+		executeTopics:      make(map[int]*pubsub.Topic, len(config.Pis)),
+		queryRequestTopics: make(map[int]*pubsub.Topic, len(config.Pis)),
 	}
-	for pi := range config.Pis {
-		name := fmt.Sprintf("execute-%d", pi)
-		et := cl.Topic(name)
-		ok, err := et.Exists(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("querying existence of %s: %s", name, err)
-		}
-		if !ok {
-			et, err = cl.CreateTopic(ctx, name)
+	for _, cur := range []struct {
+		topicPrefix string
+		dst         *map[int]*pubsub.Topic
+	}{
+		{
+			topicPrefix: "execute",
+			dst:         &res.executeTopics,
+		},
+		{
+			topicPrefix: "query-request",
+			dst:         &res.queryRequestTopics,
+		},
+	} {
+		for pi := range config.Pis {
+			(*cur.dst)[pi], err = common.GetOrCreateTopic(ctx, cl, fmt.Sprintf("%s-%d", cur.topicPrefix, pi))
 			if err != nil {
-				return nil, fmt.Errorf("creating topic %q: %s", name, err)
+				return nil, err
 			}
 		}
-		res.executeTopics[pi] = et
+	}
+	if err != nil {
+		return nil, err
 	}
 	return &res, nil
 }
@@ -82,9 +93,8 @@ func (pc *pubsubClient) Close() error {
 	for _, t := range pc.executeTopics {
 		t.Stop()
 	}
+	for _, t := range pc.queryRequestTopics {
+		t.Stop()
+	}
 	return pc.client.Close()
-}
-
-func execute(ctx context.Context) {
-
 }

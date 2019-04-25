@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/config"
 
 	rpio "github.com/stianeikeland/go-rpio/v4"
 )

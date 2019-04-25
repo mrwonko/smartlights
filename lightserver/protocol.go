@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/config"
 )
 
 type (

@@ -1,5 +1,10 @@
 package config
 
+import (
+	"fmt"
+	"strconv"
+)
+
 type ID int
 
 const (
@@ -11,7 +16,22 @@ const (
 	idUV
 	idShoe
 	idLP
+
+	idLast
 )
+
+func ParseID(raw string) (ID, *Light, error) {
+	i, err := strconv.Atoi(raw)
+	if err != nil {
+		return -1, nil, err
+	}
+	id := ID(i)
+	l := Lights[id]
+	if l == nil {
+		return -1, nil, fmt.Errorf("unknown ID %d", i)
+	}
+	return id, l, nil
+}
 
 type Light struct {
 	Name string

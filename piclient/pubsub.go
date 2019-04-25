@@ -9,7 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/common"
+	"github.com/mrwonko/smartlights/internal/config"
 
 	"cloud.google.com/go/pubsub"
 )
@@ -19,8 +20,10 @@ const (
 )
 
 type pubsubClient struct {
-	client              *pubsub.Client
-	executeSubscription *pubsub.Subscription
+	client                   *pubsub.Client
+	executeSubscription      *pubsub.Subscription
+	queryRequestSubscription *pubsub.Subscription
+	queryResponseTopic       *pubsub.Topic
 }
 
 func newPubsubClient(ctx context.Context, pi int) (_ *pubsubClient, finalErr error) {
@@ -42,30 +45,20 @@ func newPubsubClient(ctx context.Context, pi int) (_ *pubsubClient, finalErr err
 	res := pubsubClient{
 		client: cl,
 	}
-	name := fmt.Sprintf("execute-%d", pi)
-	et := cl.Topic(name)
-	ok, err := et.Exists(ctx)
+
+	execute := fmt.Sprintf("execute-%d", pi)
+	res.executeSubscription, err = common.GetOrCreateSubscription(ctx, cl, execute, execute)
 	if err != nil {
-		return nil, fmt.Errorf("querying existence of topic %q: %s", name, err)
+		return nil, err
 	}
-	if !ok {
-		et, err = cl.CreateTopic(ctx, name)
-		if err != nil {
-			return nil, fmt.Errorf("creating topic %q: %s", name, err)
-		}
-	}
-	res.executeSubscription = cl.Subscription(name)
-	ok, err = res.executeSubscription.Exists(ctx)
+	queryRequest := fmt.Sprintf("query-request-%d", pi)
+	res.queryRequestSubscription, err = common.GetOrCreateSubscription(ctx, cl, queryRequest, queryRequest)
 	if err != nil {
-		return nil, fmt.Errorf("querying existence of subscription %q: %s", name, err)
+		return nil, err
 	}
-	if !ok {
-		res.executeSubscription, err = cl.CreateSubscription(ctx, name, pubsub.SubscriptionConfig{
-			Topic: et,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("creating topic %q: %s", name, err)
-		}
+	res.queryResponseTopic, err = common.GetOrCreateTopic(ctx, cl, "query-response")
+	if err != nil {
+		return nil, err
 	}
 	return &res, nil
 }
@@ -74,7 +67,7 @@ func (pc *pubsubClient) ReceiveExecute(ctx context.Context, f func(ctx context.C
 	return pc.executeSubscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		defer msg.Ack()
 		if msg.PublishTime.Add(discardMessagesAfter).Before(time.Now()) {
-			log.Printf("skipping message due to age: %v", msg)
+			log.Printf("skipping execute message due to age: %v", msg)
 			return
 		}
 		data := config.ExecuteMessage{}
@@ -86,6 +79,23 @@ func (pc *pubsubClient) ReceiveExecute(ctx context.Context, f func(ctx context.C
 	})
 }
 
+func (pc *pubsubClient) ReceiveQueryRequest(ctx context.Context, f func(ctx context.Context, msg *config.QueryRequestMessage)) error {
+	return pc.queryRequestSubscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+		defer msg.Ack()
+		if msg.PublishTime.Add(discardMessagesAfter).Before(time.Now()) {
+			log.Printf("skipping queryRequest message due to age: %v", msg)
+			return
+		}
+		data := config.QueryRequestMessage{}
+		if err := json.Unmarshal(msg.Data, &data); err != nil {
+			log.Printf("unmarshaling %q message: %s", pc.queryRequestSubscription, err)
+			return
+		}
+		f(ctx, &data)
+	})
+}
+
 func (pc *pubsubClient) Close() error {
+	pc.queryResponseTopic.Stop()
 	return pc.client.Close()
 }

@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/config"
 )
 
 func main() {
@@ -245,6 +245,23 @@ func main() {
 			}
 			log.Printf("successful execute for %d devices", len(allDevices))
 		case intentQuery:
+			inputPayload := requestPayloadQuery{}
+			if err := json.Unmarshal(input.Payload, &inputPayload); err != nil {
+				log.Printf("fulfillment query json parse: %s", err)
+				http.Error(rw, "failed to parse body", http.StatusBadRequest)
+				return
+			}
+			byPi := map[int][]config.ID{}
+			for i := range inputPayload.Devices {
+				rawID := inputPayload.Devices[i].ID
+				id, light, err := config.ParseID(rawID)
+				if err != nil {
+					log.Printf("fulfilment query invalid request ID %q: %s", rawID, err)
+					http.Error(rw, "invalid device ID", http.StatusBadRequest)
+					return
+				}
+				byPi[light.Pi] = append(byPi[light.Pi], id)
+			}
 			log.Printf("TODO implement query")
 			http.Error(rw, "TODO implement query", http.StatusNotImplemented)
 		default:
