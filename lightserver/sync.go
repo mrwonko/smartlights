@@ -19,7 +19,7 @@ func sendSyncRequests(ctx context.Context, client *http.Client, trigger <-chan s
 			if !ok {
 				return
 			}
-			body, err := json.Marshal(struct {
+			reqBody, err := json.Marshal(struct {
 				AgentUserID string `json:"agentUserId"`
 			}{
 				AgentUserID: agentUserID,
@@ -37,7 +37,7 @@ func sendSyncRequests(ctx context.Context, client *http.Client, trigger <-chan s
 						"key": {googleAPIKey},
 					}.Encode(),
 				}).String(),
-				bytes.NewReader(body))
+				bytes.NewReader(reqBody))
 			if err != nil {
 				log.Printf("sync request creation failed: %s", err)
 				continue
@@ -47,7 +47,7 @@ func sendSyncRequests(ctx context.Context, client *http.Client, trigger <-chan s
 				log.Printf("sync request failed: %s", err)
 				continue
 			}
-			body, err = ioutil.ReadAll(resp.Body)
+			respBody, err := ioutil.ReadAll(resp.Body)
 			if closeErr := resp.Body.Close(); closeErr != nil {
 				log.Printf("sync request body closing failed: %s", err)
 				// non-fatal
@@ -58,10 +58,10 @@ func sendSyncRequests(ctx context.Context, client *http.Client, trigger <-chan s
 			}
 			if resp.StatusCode != http.StatusOK {
 				// see https://developers.google.com/actions/smarthome/report-state#error_responses
-				log.Printf("sync request response status %d: %q", resp.StatusCode, body)
+				log.Printf("sync request response status %d for request `%s`: %q", resp.StatusCode, reqBody, respBody)
 				continue
 			}
-			log.Printf("sync request successful: %q", body)
+			log.Printf("sync request successful: %q", respBody)
 		}
 	}
 }
