@@ -69,7 +69,7 @@ func main() {
 	}
 	wg.Add(1)
 	go func(ctx context.Context, chans map[uint8]chan<- uint8) {
-		pc.ReceiveExecute(ctx, func(ctx context.Context, msg *config.ExecuteMessage) {
+		err := pc.ReceiveExecute(ctx, func(ctx context.Context, msg *config.ExecuteMessage) {
 			c := chans[msg.GPIO]
 			if c == nil {
 				log.Printf("got message for unknown gpio: %v", msg)
@@ -82,6 +82,9 @@ func main() {
 			}
 			log.Printf("received message %v", msg)
 		})
+		if err != nil {
+			log.Printf("fatal error receiving execute requests: %s", err)
+		}
 		wg.Done()
 	}(ctx, chans)
 	log.Println("started listening for messages")
