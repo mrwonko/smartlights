@@ -7,9 +7,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/mrwonko/smartlights/config"
@@ -36,7 +38,15 @@ func main() {
 		return ""
 	}(oauthServer.userPasswordHashes)
 
-	pc, err := newPubsubClient(context.TODO())
+	ctx, cancel := context.WithCancel(context.Background())
+	sigChan := make(chan os.Signal, 2)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
+	pc, err := newPubsubClient(ctx)
 	if err != nil {
 		log.Fatalf("creating pubsub client: %s", err)
 	}
@@ -51,7 +61,7 @@ func main() {
 		res := make(chan struct{}, 16)
 		go sendSyncRequests(ctx, http.DefaultClient, res, googleAPIKey, user)
 		return res
-	}(context.TODO(), googleAPIKey, user)
+	}(ctx, googleAPIKey, user)
 
 	mux := http.NewServeMux()
 
@@ -258,10 +268,22 @@ func main() {
 		time.Sleep(time.Second) // allow server to finish starting
 		syncChan <- struct{}{}
 	}(syncChan)
-	err = http.ListenAndServe("127.0.0.1:18917", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithCancel(r.Context())
-		mux.ServeHTTP(w, r.WithContext(ctx))
-		cancel()
-	}))
-	log.Println("finished serving with err =", err)
+	server := http.Server{
+		Addr:    "127.0.0.1:18917",
+		Handler: mux,
+	}
+	serveErrChan := make(chan error)
+	go func() {
+		serveErrChan <- server.ListenAndServe()
+	}()
+	<-ctx.Done()
+	log.Printf("shutting down server")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err = server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("failed to shut down server: %s", err)
+	} else {
+		err = <-serveErrChan
+		log.Printf("finished serving with err=%s", err)
+	}
 }
