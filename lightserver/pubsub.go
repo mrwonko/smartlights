@@ -84,7 +84,3 @@ func (pc *pubsubClient) Close() error {
 	}
 	return pc.client.Close()
 }
-
-func execute(ctx context.Context) {
-
-}
