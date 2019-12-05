@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/common"
 
 	"cloud.google.com/go/pubsub"
 )
@@ -21,6 +22,7 @@ const (
 type pubsubClient struct {
 	client              *pubsub.Client
 	executeSubscription *pubsub.Subscription
+	stateTopic          *pubsub.Topic
 }
 
 func newPubsubClient(ctx context.Context, pi int) (_ *pubsubClient, finalErr error) {
@@ -43,29 +45,14 @@ func newPubsubClient(ctx context.Context, pi int) (_ *pubsubClient, finalErr err
 		client: cl,
 	}
 	name := fmt.Sprintf("execute-%d", pi)
-	et := cl.Topic(name)
-	ok, err := et.Exists(ctx)
+	res.executeSubscription, err = common.GetOrCreateSubscription(ctx, cl, name, name)
 	if err != nil {
-		return nil, fmt.Errorf("querying existence of topic %q: %s", name, err)
+		return nil, err
 	}
-	if !ok {
-		et, err = cl.CreateTopic(ctx, name)
-		if err != nil {
-			return nil, fmt.Errorf("creating topic %q: %s", name, err)
-		}
-	}
-	res.executeSubscription = cl.Subscription(name)
-	ok, err = res.executeSubscription.Exists(ctx)
+	name = "state"
+	res.stateTopic, err = common.GetOrCreateTopic(ctx, cl, name)
 	if err != nil {
-		return nil, fmt.Errorf("querying existence of subscription %q: %s", name, err)
-	}
-	if !ok {
-		res.executeSubscription, err = cl.CreateSubscription(ctx, name, pubsub.SubscriptionConfig{
-			Topic: et,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("creating topic %q: %s", name, err)
-		}
+		return nil, err
 	}
 	return &res, nil
 }
@@ -84,6 +71,19 @@ func (pc *pubsubClient) ReceiveExecute(ctx context.Context, f func(ctx context.C
 		}
 		f(ctx, &data)
 	})
+}
+
+func (pc *pubsubClient) State(ctx context.Context) error {
+	data, err := json.Marshal(config.StateMessage{
+		// TODO
+	})
+	if err != nil {
+		return fmt.Errorf("marshalling message: %s", err)
+	}
+	_, err = pc.stateTopic.Publish(ctx, &pubsub.Message{
+		Data: data,
+	}).Get(ctx)
+	return err
 }
 
 func (pc *pubsubClient) Close() error {

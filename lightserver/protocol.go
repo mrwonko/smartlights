@@ -84,6 +84,10 @@ type (
 		responsePayloadError
 		States map[string]interface{} `json:"states,omitempty"`
 	}
+
+	requestPayloadState struct {
+		// TODO
+	}
 )
 
 type deviceType string

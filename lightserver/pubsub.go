@@ -7,16 +7,23 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/common"
 
 	"cloud.google.com/go/pubsub"
 )
 
 type pubsubClient struct {
-	client        *pubsub.Client
-	executeTopics map[int]*pubsub.Topic
+	client            *pubsub.Client
+	executeTopics     map[int]*pubsub.Topic
+	stateSubscription *pubsub.Subscription
 }
+
+const (
+	discardMessagesAfter = time.Minute
+)
 
 func newPubsubClient(ctx context.Context) (_ *pubsubClient, finalErr error) {
 	projectID := os.Getenv("PUBSUB_PROJECT_ID")
@@ -40,18 +47,15 @@ func newPubsubClient(ctx context.Context) (_ *pubsubClient, finalErr error) {
 	}
 	for pi := range config.Pis {
 		name := fmt.Sprintf("execute-%d", pi)
-		et := cl.Topic(name)
-		ok, err := et.Exists(ctx)
+		res.executeTopics[pi], err = common.GetOrCreateTopic(ctx, cl, name)
 		if err != nil {
-			return nil, fmt.Errorf("querying existence of %s: %s", name, err)
+			return nil, err
 		}
-		if !ok {
-			et, err = cl.CreateTopic(ctx, name)
-			if err != nil {
-				return nil, fmt.Errorf("creating topic %q: %s", name, err)
-			}
-		}
-		res.executeTopics[pi] = et
+	}
+	name := "state"
+	res.stateSubscription, err = common.GetOrCreateSubscription(ctx, cl, name, name)
+	if err != nil {
+		return nil, err
 	}
 	return &res, nil
 }
@@ -76,6 +80,22 @@ func (pc *pubsubClient) OnOff(ctx context.Context, id config.ID, on bool) error 
 		Data: data,
 	}).Get(ctx)
 	return err
+}
+
+func (pc *pubsubClient) ReceiveState(ctx context.Context, f func(ctx context.Context, msg *config.StateMessage)) error {
+	return pc.stateSubscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+		defer msg.Ack()
+		if msg.PublishTime.Add(discardMessagesAfter).Before(time.Now()) {
+			log.Printf("skipping State message due to age: %v", msg)
+			return
+		}
+		data := config.StateMessage{}
+		if err := json.Unmarshal(msg.Data, &data); err != nil {
+			log.Printf("unmarshaling %q message: %s", pc.stateSubscription, err)
+			return
+		}
+		f(ctx, &data)
+	})
 }
 
 func (pc *pubsubClient) Close() error {

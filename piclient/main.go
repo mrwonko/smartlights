@@ -81,6 +81,10 @@ func main() {
 				c <- 0
 			}
 			log.Printf("received message %v", msg)
+			err := pc.State(ctx)
+			if err != nil {
+				log.Printf("error reporting state back: %s", err)
+			}
 		})
 		if err != nil {
 			log.Printf("fatal error receiving execute requests: %s", err)

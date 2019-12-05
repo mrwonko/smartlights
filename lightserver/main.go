@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -25,6 +29,10 @@ func main() {
 	googleAPIKey := os.Getenv("GOOGLE_API_KEY")
 	if googleAPIKey == "" {
 		log.Fatalf("missing GOOGLE_API_KEY")
+	}
+	googleCreds, err := loadGoogleCredentials()
+	if err != nil {
+		log.Fatalf("reading Google credentials: %s", err)
 	}
 
 	oauthServer, err := oauthServerFromEnv(loginPath, tokenPath)
@@ -268,6 +276,16 @@ func main() {
 		time.Sleep(time.Second) // allow server to finish starting
 		syncChan <- struct{}{}
 	}(syncChan)
+	go func() {
+		err := pc.ReceiveState(ctx, func(ctx context.Context, msg *config.StateMessage) {
+			if err := reportState(ctx, http.DefaultClient, user, googleCreds.privateKey, googleCreds.clientEmail); err != nil {
+				log.Printf("error reporting state: %s", err)
+			}
+		})
+		if err != nil {
+			log.Printf("fatal error receiving states: %s", err)
+		}
+	}()
 	server := http.Server{
 		Addr:    "127.0.0.1:18917",
 		Handler: mux,
@@ -286,4 +304,47 @@ func main() {
 		err = <-serveErrChan
 		log.Printf("finished serving with err=%s", err)
 	}
+}
+
+type googleCredentials struct {
+	privateKey  *rsa.PrivateKey
+	clientEmail string
+}
+
+func loadGoogleCredentials() (_ *googleCredentials, resErr error) {
+	googleCredsFilename := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	if googleCredsFilename == "" {
+		return nil, fmt.Errorf("missing GOOGLE_APPLICATION_CREDENTIALS")
+	}
+	googleCredsFile, err := os.Open(googleCredsFilename)
+	if err != nil {
+		return nil, fmt.Errorf("opening Google credentials file %q: %w", googleCredsFilename, err)
+	}
+	defer func() {
+		closeErr := googleCredsFile.Close()
+		if closeErr != nil && resErr == nil {
+			resErr = fmt.Errorf("closing %q: %w", googleCredsFilename, err)
+		}
+	}()
+	var data struct {
+		PrivateKey  string `json:"private_key"`
+		ClientEmail string `json:"client_email"`
+	}
+	if err = json.NewDecoder(googleCredsFile).Decode(&data); err != nil {
+		return nil, fmt.Errorf("parsing creds file %q: %w", googleCredsFilename, err)
+	}
+	res := googleCredentials{
+		clientEmail: data.ClientEmail,
+	}
+	block, _ := pem.Decode([]byte(data.PrivateKey))
+	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parsing private key: %w", err)
+	}
+	var ok bool
+	res.privateKey, ok = privateKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("private key is not an RSA Private Key")
+	}
+	return &res, nil
 }
