@@ -84,10 +84,10 @@ F 3 "http://www.infineon.com/dgdl/irlz34npbf.pdf?fileId=5546d462533600a401535672
 	-1   0    0    1   
 $EndComp
 $Comp
-L Connector_Generic:Conn_01x04 J5
+L Connector_Generic:Conn_01x04 J2
 U 1 1 5E66A677
 P 900 4250
-F 0 "J5" V 864 3962 50  0000 R CNN
+F 0 "J2" V 864 3962 50  0000 R CNN
 F 1 "Conn_01x04" V 773 3962 50  0000 R CNN
 F 2 "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical" H 900 4250 50  0001 C CNN
 F 3 "~" H 900 4250 50  0001 C CNN
@@ -103,10 +103,10 @@ Wire Wire Line
 Wire Wire Line
 	1450 4150 1100 4150
 $Comp
-L Connector_Generic:Conn_01x02 J6
+L Connector_Generic:Conn_01x02 J3
 U 1 1 5E67B518
 P 1400 3550
-F 0 "J6" V 1364 3362 50  0000 R CNN
+F 0 "J3" V 1364 3362 50  0000 R CNN
 F 1 "Conn_01x02_MountingPin" V 1273 3362 50  0000 R CNN
 F 2 "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" H 1400 3550 50  0001 C CNN
 F 3 "~" H 1400 3550 50  0001 C CNN
@@ -135,10 +135,10 @@ Wire Wire Line
 Wire Wire Line
 	7800 3200 8400 3200
 $Comp
-L Connector:Conn_Coaxial_Power J3
+L Connector:Conn_Coaxial_Power J10
 U 1 1 5E60BF44
 P 5450 2700
-F 0 "J3" V 5233 2650 50  0000 C CNN
+F 0 "J10" V 5233 2650 50  0000 C CNN
 F 1 "Conn_Coaxial_Power" V 5324 2650 50  0000 C CNN
 F 2 "Connector_BarrelJack:BarrelJack_Horizontal" H 5450 2650 50  0001 C CNN
 F 3 "~" H 5450 2650 50  0001 C CNN
@@ -359,10 +359,10 @@ Wire Wire Line
 Text Label 7800 3200 3    50   ~ 0
 5V
 $Comp
-L Connector_Generic:Conn_01x02 J2
+L Connector_Generic:Conn_01x02 J1
 U 1 1 5E6126E2
 P 1400 5900
-F 0 "J2" V 1364 5712 50  0000 R CNN
+F 0 "J1" V 1364 5712 50  0000 R CNN
 F 1 "Conn_01x02_MountingPin" V 1273 5712 50  0000 R CNN
 F 2 "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" H 1400 5900 50  0001 C CNN
 F 3 "~" H 1400 5900 50  0001 C CNN
@@ -443,10 +443,10 @@ PWR,21
 Text Label 7000 3200 2    50   ~ 0
 5V_raw
 $Comp
-L Connector_Generic:Conn_02x20_Odd_Even J1
+L Connector_Generic:Conn_02x20_Odd_Even J11
 U 1 1 5E600282
 P 3600 3450
-F 0 "J1" H 3650 4567 50  0000 C CNN
+F 0 "J11" H 3650 4567 50  0000 C CNN
 F 1 "Conn_02x20_Odd_Even_MountingPin" H 3650 4476 50  0000 C CNN
 F 2 "Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical" H 3600 3450 50  0001 C CNN
 F 3 "~" H 3600 3450 50  0001 C CNN
@@ -465,10 +465,10 @@ F 3 "~" H 4650 3350 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L Connector_Generic:Conn_01x02 J8
+L Connector_Generic:Conn_01x02 J6
 U 1 1 5E7C76E0
 P 4650 3600
-F 0 "J8" V 4614 3412 50  0000 R CNN
+F 0 "J6" V 4614 3412 50  0000 R CNN
 F 1 "Conn_01x02_MountingPin" V 4523 3412 50  0000 R CNN
 F 2 "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" H 4650 3600 50  0001 C CNN
 F 3 "~" H 4650 3600 50  0001 C CNN
@@ -476,10 +476,10 @@ F 3 "~" H 4650 3600 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L Connector_Generic:Conn_01x02 J9
+L Connector_Generic:Conn_01x02 J5
 U 1 1 5E7C7DFD
 P 4650 3850
-F 0 "J9" V 4614 3662 50  0000 R CNN
+F 0 "J5" V 4614 3662 50  0000 R CNN
 F 1 "Conn_01x02_MountingPin" V 4523 3662 50  0000 R CNN
 F 2 "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" H 4650 3850 50  0001 C CNN
 F 3 "~" H 4650 3850 50  0001 C CNN
@@ -488,23 +488,11 @@ F 3 "~" H 4650 3850 50  0001 C CNN
 $EndComp
 Wire Wire Line
 	4450 3350 3900 3350
-Wire Wire Line
-	4450 3600 4200 3600
-Wire Wire Line
-	4200 3600 4200 3550
-Wire Wire Line
-	4200 3550 3900 3550
-Wire Wire Line
-	4450 3850 4100 3850
-Wire Wire Line
-	4100 3850 4100 3650
-Wire Wire Line
-	4100 3650 3900 3650
 $Comp
-L Connector_Generic:Conn_01x02 J11
+L Connector_Generic:Conn_01x02 J8
 U 1 1 5E7E2973
 P 4650 3100
-F 0 "J11" V 4614 2912 50  0000 R CNN
+F 0 "J8" V 4614 2912 50  0000 R CNN
 F 1 "Conn_01x02_MountingPin" V 4523 2912 50  0000 R CNN
 F 2 "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" H 4650 3100 50  0001 C CNN
 F 3 "~" H 4650 3100 50  0001 C CNN
@@ -512,28 +500,16 @@ F 3 "~" H 4650 3100 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L Connector_Generic:Conn_01x02 J10
+L Connector_Generic:Conn_01x02 J9
 U 1 1 5E7E2D89
 P 4650 2850
-F 0 "J10" V 4614 2662 50  0000 R CNN
+F 0 "J9" V 4614 2662 50  0000 R CNN
 F 1 "Conn_01x02_MountingPin" V 4523 2662 50  0000 R CNN
 F 2 "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" H 4650 2850 50  0001 C CNN
 F 3 "~" H 4650 2850 50  0001 C CNN
 	1    4650 2850
 	1    0    0    -1  
 $EndComp
-Wire Wire Line
-	4450 3100 4200 3100
-Wire Wire Line
-	4200 3100 4200 3250
-Wire Wire Line
-	4200 3250 3900 3250
-Wire Wire Line
-	3900 3150 4100 3150
-Wire Wire Line
-	4100 3150 4100 2850
-Wire Wire Line
-	4100 2850 4450 2850
 Text GLabel 4450 2950 0    50   Input ~ 0
 GND
 NoConn ~ 3900 3450
@@ -545,4 +521,28 @@ Text GLabel 4450 3700 0    50   Input ~ 0
 GND
 Text GLabel 4450 3950 0    50   Input ~ 0
 GND
+Wire Wire Line
+	4100 3150 4100 2850
+Wire Wire Line
+	3900 3150 4100 3150
+Wire Wire Line
+	4100 2850 4450 2850
+Wire Wire Line
+	4200 3100 4200 3250
+Wire Wire Line
+	4450 3100 4200 3100
+Wire Wire Line
+	4200 3250 3900 3250
+Wire Wire Line
+	4100 3850 4100 3650
+Wire Wire Line
+	4450 3850 4100 3850
+Wire Wire Line
+	4100 3650 3900 3650
+Wire Wire Line
+	4200 3550 3900 3550
+Wire Wire Line
+	4450 3600 4200 3600
+Wire Wire Line
+	4200 3600 4200 3550
 $EndSCHEMATC
