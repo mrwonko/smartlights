@@ -278,7 +278,7 @@ F 3 "http://www.ti.com/lit/ds/symlink/lm2596.pdf" H 5750 1550 50  0001 C CNN
 	1    5750 1550
 	1    0    0    -1  
 $EndComp
-Text GLabel 4400 2800 1    50   Input ~ 0
+Text GLabel 4400 2650 1    50   Input ~ 0
 5V
 Text GLabel 5250 1150 2    50   Output ~ 0
 12V
@@ -292,7 +292,7 @@ Text GLabel 1100 4350 2    50   Input ~ 0
 GND
 Text GLabel 1700 3550 2    50   Input ~ 0
 GND
-Text GLabel 4300 5400 3    50   Input ~ 0
+Text GLabel 4600 5500 3    50   Input ~ 0
 GND
 Wire Wire Line
 	5050 1450 5050 1650
@@ -458,8 +458,6 @@ F 3 "~" H 7700 3350 50  0001 C CNN
 $EndComp
 NoConn ~ 5400 3300
 NoConn ~ 5400 3200
-NoConn ~ 4900 5400
-NoConn ~ 4800 5400
 Text GLabel 5400 3800 2    50   Input ~ 0
 pin7
 Text GLabel 2500 5600 2    50   Input ~ 0
@@ -542,16 +540,9 @@ NoConn ~ 3800 3900
 NoConn ~ 3800 4000
 NoConn ~ 3800 4100
 NoConn ~ 5400 3500
-NoConn ~ 5400 3600
 NoConn ~ 5400 4600
 NoConn ~ 5400 4800
 NoConn ~ 5400 4900
-NoConn ~ 4200 5400
-NoConn ~ 4400 5400
-NoConn ~ 4500 5400
-NoConn ~ 4600 5400
-NoConn ~ 4700 5400
-NoConn ~ 4500 2800
 NoConn ~ 4700 2800
 NoConn ~ 4800 2800
 NoConn ~ 3800 4700
@@ -571,4 +562,38 @@ F 3 "~" H 7300 1450 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 Connection ~ 7300 1450
+Wire Wire Line
+	4500 2800 4400 2800
+Wire Wire Line
+	4400 2800 4400 2650
+Connection ~ 4400 2800
+Wire Wire Line
+	4900 5400 4900 5500
+Wire Wire Line
+	4900 5500 4600 5500
+Wire Wire Line
+	4600 5500 4600 5400
+NoConn ~ 4700 5400
+NoConn ~ 4800 5400
+$Comp
+L Switch:SW_Push SW1
+U 1 1 5E7FD75B
+P 5600 3600
+F 0 "SW1" H 5600 3885 50  0000 C CNN
+F 1 "SW_Push" H 5600 3794 50  0000 C CNN
+F 2 "Button_Switch_THT:SW_PUSH_6mm" H 5600 3800 50  0001 C CNN
+F 3 "~" H 5600 3800 50  0001 C CNN
+	1    5600 3600
+	1    0    0    -1  
+$EndComp
+Text GLabel 5800 3600 2    50   Input ~ 0
+GND
+NoConn ~ 4200 5400
+NoConn ~ 4400 5400
+NoConn ~ 4500 5400
+Wire Wire Line
+	4600 5500 4300 5500
+Wire Wire Line
+	4300 5500 4300 5400
+Connection ~ 4600 5500
 $EndSCHEMATC
