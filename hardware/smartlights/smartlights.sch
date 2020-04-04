@@ -57,17 +57,6 @@ F 3 "http://www.infineon.com/dgdl/irlz34npbf.pdf?fileId=5546d462533600a401535672
 	1    1800 3250
 	-1   0    0    1   
 $EndComp
-$Comp
-L Connector_Generic:Conn_01x04 J2
-U 1 1 5E66A677
-P 900 4250
-F 0 "J2" V 864 3962 50  0000 R CNN
-F 1 "Conn_01x04" V 773 3962 50  0000 R CNN
-F 2 "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical" H 900 4250 50  0001 C CNN
-F 3 "~" H 900 4250 50  0001 C CNN
-	1    900  4250
-	-1   0    0    1   
-$EndComp
 Wire Wire Line
 	1100 4250 1350 4250
 Wire Wire Line
@@ -288,8 +277,6 @@ Text GLabel 5700 2350 0    50   Input ~ 0
 GND
 Text GLabel 1700 2950 2    50   Input ~ 0
 GND
-Text GLabel 1100 4350 2    50   Input ~ 0
-GND
 Text GLabel 1700 3550 2    50   Input ~ 0
 GND
 Text GLabel 4600 5500 3    50   Input ~ 0
@@ -298,12 +285,8 @@ Wire Wire Line
 	5050 1450 5050 1650
 Text GLabel 1700 5400 2    50   Input ~ 0
 12V
-Text GLabel 1700 3650 2    50   Input ~ 0
-12V
 Text GLabel 1700 4100 2    50   Input ~ 0
-12V
-Text GLabel 1700 4550 2    50   Input ~ 0
-12V
+GND
 Text GLabel 1700 2450 2    50   Input ~ 0
 12V
 Text GLabel 1700 3050 2    50   Input ~ 0
@@ -343,11 +326,11 @@ Wire Wire Line
 Wire Wire Line
 	1450 4500 1700 4500
 Text Label 1350 4400 3    50   ~ 0
-PWR_R
+GND_B
 Text Label 1450 4300 3    50   ~ 0
-PWR_G
+GND_G
 Text Label 1400 4050 2    50   ~ 0
-PWR_B
+GND_R
 Wire Wire Line
 	1600 5800 1700 5800
 Wire Wire Line
@@ -361,11 +344,11 @@ Wire Wire Line
 Wire Wire Line
 	1600 2850 1700 2850
 Text Label 2500 3850 2    50   ~ 0
-Data_B
+Data_R
 Text Label 2500 4300 2    50   ~ 0
 Data_G
 Text Label 2500 4750 2    50   ~ 0
-Data_R
+Data_B
 Text Label 2500 3250 2    50   ~ 0
 Data_19
 Text Label 2500 2650 2    50   ~ 0
@@ -596,4 +579,21 @@ Wire Wire Line
 Wire Wire Line
 	4300 5500 4300 5400
 Connection ~ 4600 5500
+Text GLabel 1700 3650 2    50   Input ~ 0
+GND
+Text GLabel 1700 4550 2    50   Input ~ 0
+GND
+$Comp
+L Connector_Generic:Conn_01x04 J2
+U 1 1 5E66A677
+P 900 4150
+F 0 "J2" V 864 3862 50  0000 R CNN
+F 1 "Conn_01x04" V 773 3862 50  0000 R CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical" H 900 4150 50  0001 C CNN
+F 3 "~" H 900 4150 50  0001 C CNN
+	1    900  4150
+	-1   0    0    -1  
+$EndComp
+Text GLabel 1100 4350 2    50   Input ~ 0
+12V
 $EndSCHEMATC
