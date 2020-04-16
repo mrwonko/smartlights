@@ -20,45 +20,20 @@ type Light struct {
 }
 
 var Lights = map[ID]*Light{
-	idRed: {
-		Name: "Red",
-		Pi:   0,
-		GPIO: 13,
-	},
-	idGreen: {
-		Name: "Green",
-		Pi:   0,
-		GPIO: 19,
-	},
-	idBlue: {
-		Name: "Blue",
-		Pi:   0,
-		GPIO: 18,
-	},
-	idBar: {
-		Name: "Bar",
-		Pi:   0,
-		GPIO: 16,
-	},
 	idSofa: {
-		Name: "Sofa",
+		Name: "Journey Light",
 		Pi:   0,
-		GPIO: 20,
-	},
-	idUV: {
-		Name: "UV",
-		Pi:   0,
-		GPIO: 21,
+		GPIO: 10,
 	},
 	idShoe: {
 		Name: "Shoe Light",
 		Pi:   0,
-		GPIO: 12,
+		GPIO: 9,
 	},
 	idLP: {
-		Name: "LP Light",
+		Name: "TV Light",
 		Pi:   0,
-		GPIO: 26,
+		GPIO: 4,
 	},
 }
 
