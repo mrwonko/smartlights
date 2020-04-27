@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -21,10 +22,13 @@ const (
 )
 
 func main() {
-	const (
-		pi = 0
-	)
-	err := rpio.Open()
+	const piEnv = "PI_ID"
+	// TODO: parse from human-readable string?
+	pi, err := strconv.Atoi(os.Getenv(piEnv))
+	if err != nil {
+		log.Fatalf("failed to parse $%s: %s", piEnv, err)
+	}
+	err = rpio.Open()
 	if err != nil {
 		log.Fatalf("failed to init go-rpio: %s", err)
 	}
