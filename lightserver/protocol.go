@@ -27,15 +27,17 @@ type (
 	}
 
 	requestPayloadExecute struct {
-		Commands []struct {
-			Devices []struct {
-				ID string `json:"id"`
-			} `json:"devices"`
-			Execution []struct {
-				Command string                 `json:"command"`
-				Params  map[string]interface{} `json:"params"` // string/number/boolean
-			} `json:"execution"`
-		} `json:"commands"`
+		Commands []requestPayloadExecuteCommand `json:"commands"`
+	}
+
+	requestPayloadExecuteCommand struct {
+		Devices []struct {
+			ID string `json:"id"`
+		} `json:"devices"`
+		Execution []struct {
+			Command string                 `json:"command"`
+			Params  map[string]interface{} `json:"params"` // string/number/boolean
+		} `json:"execution"`
 	}
 
 	response struct {
