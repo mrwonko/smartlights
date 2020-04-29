@@ -60,6 +60,7 @@ func newPubsubClient(ctx context.Context) (_ *pubsubClient, finalErr error) {
 	return &res, nil
 }
 
+// TODO: instead of sending individual commands, send a list of them, so we can do one message per device in an execute intent.
 func (pc *pubsubClient) OnOff(ctx context.Context, id config.ID, on bool) error {
 	light := config.Lights[id]
 	if light == nil {
