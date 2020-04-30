@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/mrwonko/smartlights/config"
-	"github.com/mrwonko/smartlights/internal/common"
+	"github.com/mrwonko/smartlights/internal/pubsubhelper"
 
 	"cloud.google.com/go/pubsub"
 )
@@ -45,12 +45,12 @@ func newPubsubClient(ctx context.Context, pi int) (_ *pubsubClient, finalErr err
 		client: cl,
 	}
 	name := fmt.Sprintf("execute-%d", pi)
-	res.executeSubscription, err = common.GetOrCreateSubscription(ctx, cl, name, name)
+	res.executeSubscription, err = pubsubhelper.GetOrCreateSubscription(ctx, cl, name, name)
 	if err != nil {
 		return nil, err
 	}
 	name = "state"
-	res.stateTopic, err = common.GetOrCreateTopic(ctx, cl, name)
+	res.stateTopic, err = pubsubhelper.GetOrCreateTopic(ctx, cl, name)
 	if err != nil {
 		return nil, err
 	}
