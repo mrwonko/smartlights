@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/protocol"
 
 	rpio "github.com/stianeikeland/go-rpio/v4"
 )
@@ -73,7 +74,7 @@ func main() {
 	}
 	wg.Add(1)
 	go func(ctx context.Context, chans map[uint8]chan<- uint8) {
-		err := pc.ReceiveExecute(ctx, func(ctx context.Context, msg *config.ExecuteMessage) {
+		err := pc.ReceiveExecute(ctx, func(ctx context.Context, msg *protocol.ExecuteMessage) {
 			c := chans[msg.GPIO]
 			if c == nil {
 				log.Printf("got message for unknown gpio: %v", msg)

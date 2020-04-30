@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/protocol"
 	"github.com/mrwonko/smartlights/internal/pubsubhelper"
 
 	"cloud.google.com/go/pubsub"
@@ -70,7 +71,7 @@ func (pc *pubsubClient) OnOff(ctx context.Context, id config.ID, on bool) error 
 	if topic == nil {
 		return fmt.Errorf("invalid pi %d", light.Pi)
 	}
-	data, err := json.Marshal(config.ExecuteMessage{
+	data, err := json.Marshal(protocol.ExecuteMessage{
 		GPIO: light.GPIO,
 		On:   on,
 	})
@@ -83,14 +84,14 @@ func (pc *pubsubClient) OnOff(ctx context.Context, id config.ID, on bool) error 
 	return err
 }
 
-func (pc *pubsubClient) ReceiveState(ctx context.Context, f func(ctx context.Context, msg *config.StateMessage)) error {
+func (pc *pubsubClient) ReceiveState(ctx context.Context, f func(ctx context.Context, msg *protocol.StateMessage)) error {
 	return pc.stateSubscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		defer msg.Ack()
 		if msg.PublishTime.Add(discardMessagesAfter).Before(time.Now()) {
 			log.Printf("skipping State message due to age: %v", msg)
 			return
 		}
-		data := config.StateMessage{}
+		data := protocol.StateMessage{}
 		if err := json.Unmarshal(msg.Data, &data); err != nil {
 			log.Printf("unmarshaling %q message: %s", pc.stateSubscription, err)
 			return

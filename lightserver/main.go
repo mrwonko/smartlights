@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/protocol"
 )
 
 func main() {
@@ -78,7 +78,7 @@ func main() {
 		syncChan <- struct{}{}
 	}(syncChan)
 	go func() {
-		err := pc.ReceiveState(ctx, func(ctx context.Context, msg *config.StateMessage) {
+		err := pc.ReceiveState(ctx, func(ctx context.Context, msg *protocol.StateMessage) {
 			if err := reportState(ctx, http.DefaultClient, user, googleCreds.privateKey, googleCreds.clientEmail); err != nil {
 				log.Printf("error reporting state: %s", err)
 			}

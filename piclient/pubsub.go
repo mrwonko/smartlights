@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/protocol"
 	"github.com/mrwonko/smartlights/internal/pubsubhelper"
 
 	"cloud.google.com/go/pubsub"
@@ -57,14 +57,14 @@ func newPubsubClient(ctx context.Context, pi int) (_ *pubsubClient, finalErr err
 	return &res, nil
 }
 
-func (pc *pubsubClient) ReceiveExecute(ctx context.Context, f func(ctx context.Context, msg *config.ExecuteMessage)) error {
+func (pc *pubsubClient) ReceiveExecute(ctx context.Context, f func(ctx context.Context, msg *protocol.ExecuteMessage)) error {
 	return pc.executeSubscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		defer msg.Ack()
 		if msg.PublishTime.Add(discardMessagesAfter).Before(time.Now()) {
 			log.Printf("skipping message due to age: %v", msg)
 			return
 		}
-		data := config.ExecuteMessage{}
+		data := protocol.ExecuteMessage{}
 		if err := json.Unmarshal(msg.Data, &data); err != nil {
 			log.Printf("unmarshaling %q message: %s", pc.executeSubscription, err)
 			return
@@ -74,7 +74,7 @@ func (pc *pubsubClient) ReceiveExecute(ctx context.Context, f func(ctx context.C
 }
 
 func (pc *pubsubClient) State(ctx context.Context) error {
-	data, err := json.Marshal(config.StateMessage{
+	data, err := json.Marshal(protocol.StateMessage{
 		// TODO
 	})
 	if err != nil {

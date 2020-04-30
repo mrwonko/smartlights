@@ -1,4 +1,4 @@
-package config
+package protocol
 
 type ExecuteMessage struct {
 	GPIO uint8
