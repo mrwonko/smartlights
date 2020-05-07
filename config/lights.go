@@ -12,6 +12,10 @@ const (
 	idShoe
 	idLP
 	idKitchenSink
+	_ // this index is cursed for some reason, Google won't send us requests for it (WTF?!?)
+	idLiquorGreen
+	idLiquorBlue
+	idLiquorRed
 )
 
 const (
@@ -45,6 +49,21 @@ var Lights = map[ID]*Light{
 		Name: "Sink Light",
 		Pi:   raspiLightKitchen,
 		GPIO: 4,
+	},
+	idLiquorRed: {
+		Name: "Red Liquor Light",
+		Pi:   raspiLightKitchen,
+		GPIO: 27,
+	},
+	idLiquorGreen: {
+		Name: "Green Liquor Light",
+		Pi:   raspiLightKitchen,
+		GPIO: 22,
+	},
+	idLiquorBlue: {
+		Name: "Blue Liquor Light",
+		Pi:   raspiLightKitchen,
+		GPIO: 17,
 	},
 }
 
