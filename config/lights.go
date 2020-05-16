@@ -3,10 +3,10 @@ package config
 type ID int
 
 const (
-	_ ID = iota // idRed
-	_           // idGreen
-	_           // idBlue
-	_           // idBar
+	idShelfRed ID = iota
+	idShelfGreen
+	idShelfBlue
+	_ // idBar
 	idSofa
 	_ // idUV
 	idShoe
@@ -30,6 +30,21 @@ type Light struct {
 }
 
 var Lights = map[ID]*Light{
+	idShelfRed: {
+		Name: "Red Shelf Light",
+		Pi:   raspiLight,
+		GPIO: 17,
+	},
+	idShelfGreen: {
+		Name: "Green Shelf Light",
+		Pi:   raspiLight,
+		GPIO: 22,
+	},
+	idShelfBlue: {
+		Name: "Blue Shelf Light",
+		Pi:   raspiLight,
+		GPIO: 27,
+	},
 	idSofa: {
 		Name: "Journey Light",
 		Pi:   raspiLight,
