@@ -93,6 +93,7 @@ func main() {
 		})
 		if err != nil {
 			log.Printf("fatal error receiving execute requests: %s", err)
+			cancel()
 		}
 		wg.Done()
 	}(ctx, chans)
