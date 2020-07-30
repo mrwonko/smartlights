@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mrwonko/smartlights/config"
+	"github.com/mrwonko/smartlights/internal/protocol"
 )
 
 // serveFulfillment returns an http.HandlerFunc that handles requests made by Google Home.
@@ -113,106 +114,80 @@ func serveFulfillmentExecute(ctx context.Context, pc *pubsubClient, req *request
 		http.Error(rw, "failed to parse body", http.StatusBadRequest)
 		return
 	}
-	// write individual errors to deviceErrs. Once it is closed, a map of all collected errors is sent to deviceErrsMapChan.
-	deviceErrs, deviceErrsMapChan := func(ctx context.Context) (chan<- deviceErr, <-chan map[config.ID][]error) {
-		reqChan := make(chan deviceErr)
-		resChan := make(chan map[config.ID][]error)
-		go func(ctx context.Context, reqChan <-chan deviceErr, resChan chan<- map[config.ID][]error) {
-			defer close(resChan)
-			res := map[config.ID][]error{}
-			for {
-				select {
-				case req, ok := <-reqChan:
-					if !ok {
-						resChan <- res
-						return
-					}
-					errs := res[req.device]
-					if req.err != nil {
-						errs = append(errs, req.err)
-					}
-					res[req.device] = errs
-				case <-ctx.Done():
-					return
-				}
-			}
-		}(ctx, reqChan, resChan)
-		return reqChan, resChan
-	}(ctx)
-	var wg sync.WaitGroup
-	for i := range inputPayload.Commands {
-		command := &inputPayload.Commands[i]
-		if errCode, err := handleCommand(ctx, pc, &wg, deviceErrs, command); err != nil {
+
+	messagesByPi, errCode, err := convertExecuteCommand(&inputPayload)
+	if err != nil {
+		log.Printf("fulfilment execute convert: %s", err)
+		if err := json.NewEncoder(rw).Encode(response{
+			RequestID: req.RequestID,
+			Payload: responsePayloadError{
+				ErrorCode: errCode,
+			},
+		}); err != nil {
 			log.Printf("fulfillment execute error response: %s", err)
-			if err := json.NewEncoder(rw).Encode(response{
-				RequestID: req.RequestID,
-				Payload: responsePayloadError{
-					ErrorCode: errCode,
-				},
-			}); err != nil {
-				log.Printf("fulfillment execute error response: %s", err)
-			}
-			return
 		}
+		return
+	}
+
+	type result struct {
+		pi  int
+		err error
+	}
+	results := make([]result, len(messagesByPi))
+	i := 0
+	var wg sync.WaitGroup
+	for pi, cmd := range messagesByPi {
+		wg.Add(1)
+		go func(i int, pi int, cmd protocol.ExecuteMessage) {
+			defer wg.Done()
+			err := pc.Execute(ctx, pi, cmd)
+			results[i] = result{pi: pi, err: err}
+		}(i, pi, cmd)
+		i++
 	}
 	wg.Wait()
-	close(deviceErrs)
-	deviceErrsMap := <-deviceErrsMapChan
 
-	type failedDevice struct {
-		id   config.ID
-		errs []error
-	}
-	var successfulDevices []config.ID
-	var failedDevices []failedDevice
-	for id, errs := range deviceErrsMap {
-		if len(errs) == 0 {
-			successfulDevices = append(successfulDevices, id)
-		} else {
-			failedDevices = append(failedDevices, failedDevice{id: id, errs: errs})
+	// for every requested device, contain the list of errors, which may be empty
+	deviceErrors := map[config.ID][]error{}
+	for _, res := range results {
+		ids := map[config.ID]struct{}{}
+		for _, cmd := range messagesByPi[res.pi].Commands {
+			for _, id := range cmd.Devices {
+				ids[id] = struct{}{}
+			}
 		}
-	}
-
-	numCommands := 0
-	if len(successfulDevices) > 0 {
-		numCommands++
-	}
-	if len(failedDevices) > 0 {
-		numCommands++
+		var errs []error
+		if res.err != nil {
+			errs = []error{err}
+		}
+		for id := range ids {
+			deviceErrors[id] = append(deviceErrors[id], errs...)
+		}
 	}
 
 	payload := responsePayloadExecute{
-		Commands: make([]responsePayloadExecuteCommand, numCommands),
+		Commands: make([]responsePayloadExecuteCommand, len(deviceErrors)),
 	}
 	curCommand := 0
-	if len(successfulDevices) > 0 {
+	for id, errs := range deviceErrors {
 		cmd := &payload.Commands[curCommand]
 		curCommand++
-		cmd.IDs = make([]string, len(successfulDevices))
-		for i, id := range successfulDevices {
-			cmd.IDs[i] = strconv.Itoa(int(id))
-		}
-		cmd.Status = statusPending
-	}
-	if len(failedDevices) > 0 {
-		cmd := &payload.Commands[curCommand]
-		curCommand++
-		cmd.IDs = make([]string, len(failedDevices))
-		var b strings.Builder
-		for i, fd := range failedDevices {
-			if i > 0 {
-				b.WriteString(", ")
+		cmd.IDs = []string{strconv.Itoa(int(id))}
+		if len(errs) == 0 {
+			cmd.Status = statusPending
+		} else {
+			var b strings.Builder
+			for i, err := range errs {
+				if i > 0 {
+					b.WriteString(", ")
+				}
+				b.WriteString(err.Error())
 			}
-			cmd.IDs[i] = strconv.Itoa(int(fd.id))
-			fmt.Fprintf(&b, "error(s) toggling device %d:", fd.id)
-			for _, err := range fd.errs {
-				fmt.Fprintf(&b, " %q", err)
-			}
+			msg := b.String()
+			cmd.DebugString = &msg
+			cmd.Status = statusError
+			cmd.ErrorCode = errorCodeTransientError
 		}
-		msg := b.String()
-		cmd.DebugString = &msg
-		cmd.Status = statusError
-		cmd.ErrorCode = errorCodeTransientError
 	}
 	if err := json.NewEncoder(io.MultiWriter(rw, os.Stderr)).Encode(response{
 		RequestID: req.RequestID,
@@ -224,53 +199,42 @@ func serveFulfillmentExecute(ctx context.Context, pc *pubsubClient, req *request
 	log.Printf("successful execute")
 }
 
-// handleCommand sends the results of handling each command to the deviceErrs channel asynchronously, incrementing wg until that is done.
-func handleCommand(ctx context.Context, pc *pubsubClient, wg *sync.WaitGroup, deviceErrs chan<- deviceErr, command *requestPayloadExecuteCommand) (errorCode, error) {
-	devices := make(map[config.ID]*config.Light, len(command.Devices))
-	for i := range command.Devices {
-		id, err := strconv.Atoi(command.Devices[i].ID)
-		if err != nil {
-			return errorCodeDeviceNotFound, fmt.Errorf("fulfillment execute device ID %q parse: %s", command.Devices[i].ID, err)
-		}
-		light := config.Lights[config.ID(id)]
-		if light == nil {
-			return errorCodeDeviceNotFound, fmt.Errorf("unknown device %d", id)
-		}
-		devices[config.ID(id)] = light
-	}
-
-	ons := make([]bool, 0, len(command.Execution)) // TODO: remove
-	for i := range command.Execution {
-		e := &command.Execution[i]
-		switch e.Command {
-		case "action.devices.commands.OnOff":
-			on, ok := e.Params["on"].(bool)
-			if !ok {
-				return errorCodeProtocolError, fmt.Errorf(`fulfillment execute OnOff command without "on" param`)
+func convertExecuteCommand(ex *requestPayloadExecute) (map[int]protocol.ExecuteMessage, errorCode, error) {
+	res := map[int]protocol.ExecuteMessage{}
+	for _, cmd := range ex.Commands {
+		devicesByPi := map[int][]config.ID{}
+		for _, d := range cmd.Devices {
+			id, err := strconv.Atoi(d.ID)
+			if err != nil {
+				return nil, errorCodeDeviceNotFound, fmt.Errorf("device ID %q parse: %s", d.ID, err)
 			}
-			ons = append(ons, on)
-		default:
-			return errorCodeFunctionNotSupported, fmt.Errorf("unsupported command %q", e.Command)
+			l := config.Lights[config.ID(id)]
+			if l == nil {
+				return nil, errorCodeDeviceNotFound, fmt.Errorf("unknown device ID %d", id)
+			}
+			devicesByPi[l.Pi] = append(devicesByPi[l.Pi], config.ID(id))
 		}
-	}
-	// FIXME: collect errors properly so this limit can be removed
-	if len(ons) > 1 {
-		return errorCodeProtocolError, fmt.Errorf("too many ons: %v", ons)
-	}
-
-	for _, on := range ons {
-		for id := range devices {
-			wg.Add(1)
-			go func(id config.ID, on bool) {
-				deviceErrs <- deviceErr{
-					device: id,
-					err:    pc.OnOff(ctx, id, on),
+		executions := make([]protocol.ExecuteExecution, len(cmd.Execution))
+		for i, ex := range cmd.Execution {
+			switch ex.Command {
+			case "action.devices.commands.OnOff":
+				on, ok := ex.Params["on"].(bool)
+				if !ok {
+					return nil, errorCodeProtocolError, fmt.Errorf(`OnOff command without "on" param`)
 				}
-				wg.Done()
-			}(id, on)
+				executions[i] = protocol.ExecuteExecutionOnOff{On: on}
+			default:
+				return nil, errorCodeFunctionNotSupported, fmt.Errorf("unsupported command %q", ex.Command)
+			}
+		}
+		for pi, devices := range devicesByPi {
+			res[pi] = protocol.ExecuteMessage{Commands: append(res[pi].Commands, &protocol.ExecuteCommand{
+				Devices:    devices,
+				Executions: executions,
+			})}
 		}
 	}
-	return "", nil
+	return res, "", nil
 }
 
 func serveFulfillmentQuery(rw http.ResponseWriter) {

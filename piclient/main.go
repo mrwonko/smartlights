@@ -75,15 +75,36 @@ func main() {
 	wg.Add(1)
 	go func(ctx context.Context, chans map[uint8]chan<- uint8) {
 		err := pc.ReceiveExecute(ctx, func(ctx context.Context, msg *protocol.ExecuteMessage) {
-			c := chans[msg.GPIO]
-			if c == nil {
-				log.Printf("got message for unknown gpio: %v", msg)
-				return
-			}
-			if msg.On {
-				c <- 255
-			} else {
-				c <- 0
+			for _, cmd := range msg.Commands {
+				for _, id := range cmd.Devices {
+					light := config.Lights[id]
+					if light == nil {
+						log.Printf("got message for unknown device: %d", id)
+						return
+					}
+					if light.Pi != pi {
+						log.Printf("got message for device %d from different pi: %d (want %d)", id, light.Pi, pi)
+						return
+					}
+					c := chans[light.GPIO]
+					if c == nil {
+						log.Printf("got message for unknown gpio %d of light %d", light.GPIO, id)
+						return
+					}
+					for _, ex := range cmd.Executions {
+						switch ex := ex.(type) {
+						case protocol.ExecuteExecutionOnOff:
+							if ex.On {
+								c <- 255
+							} else {
+								c <- 0
+							}
+						default:
+							log.Printf("got message with execution of unhandled type %T", ex)
+							return
+						}
+					}
+				}
 			}
 			log.Printf("received message %v", msg)
 			err := pc.State(ctx)

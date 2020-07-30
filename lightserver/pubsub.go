@@ -62,19 +62,12 @@ func newPubsubClient(ctx context.Context) (_ *pubsubClient, finalErr error) {
 }
 
 // TODO: instead of sending individual commands, send a list of them, so we can do one message per device in an execute intent.
-func (pc *pubsubClient) OnOff(ctx context.Context, id config.ID, on bool) error {
-	light := config.Lights[id]
-	if light == nil {
-		return fmt.Errorf("invalid light ID %d", id)
-	}
-	topic := pc.executeTopics[light.Pi]
+func (pc *pubsubClient) Execute(ctx context.Context, pi int, msg protocol.ExecuteMessage) error {
+	topic := pc.executeTopics[pi]
 	if topic == nil {
-		return fmt.Errorf("invalid pi %d", light.Pi)
+		return fmt.Errorf("invalid pi %d", pi)
 	}
-	data, err := json.Marshal(protocol.ExecuteMessage{
-		GPIO: light.GPIO,
-		On:   on,
-	})
+	data, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("marshalling message: %s", err)
 	}
