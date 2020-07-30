@@ -17,3 +17,14 @@ This is an attachment for the Raspberry Pi Zero for Google Home-controlled light
 * J1-J4 assume a slightly too small footprint
 
 This can be manually patched by changing the center pin of the transistors from 12V to GND, and changing the GND on J1-J4 to 12V. To retain correct pin order on J1-J4, they also need to be installed with 180° rotation. This in turn means they slightly overlap with the transistors, unless those are installed at a slight angle.
+
+## Next steps
+
+* implement state pushing
+* implement state querying
+* write my own unsafe but fast GPIO library
+* use that library in clients to implement single-threaded flicker-free PWM dimming
+* implement RGB lights
+  * white calibration
+* implement buttons
+* implement animations ("scenes")

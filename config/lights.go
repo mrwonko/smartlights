@@ -29,6 +29,7 @@ type Light struct {
 	GPIO uint8
 }
 
+// TODO: rename to Devices, support different types
 var Lights = map[ID]*Light{
 	idShelfRed: {
 		Name: "Red Shelf Light",
