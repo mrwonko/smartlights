@@ -16,7 +16,7 @@ func TestExecuteMessage_MarshalJSON(t *testing.T) {
 		{
 			name: "christmas tree",
 			value: ExecuteMessage{
-				Commands: []ExecuteCommand{
+				Commands: []*ExecuteCommand{
 					{
 						Devices: []config.ID{1, 2, 3},
 						Executions: []ExecuteExecution{
