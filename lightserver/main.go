@@ -78,8 +78,9 @@ func main() {
 		syncChan <- struct{}{}
 	}(syncChan)
 	go func() {
+		tokenCache := newAccessTokenCache(http.DefaultClient, googleCreds.privateKey, googleCreds.clientEmail)
 		err := pc.ReceiveState(ctx, func(ctx context.Context, msg *protocol.StateMessage) {
-			if err := reportState(ctx, http.DefaultClient, user, googleCreds.privateKey, googleCreds.clientEmail); err != nil {
+			if err := reportState(ctx, tokenCache, http.DefaultClient, user); err != nil {
 				log.Printf("error reporting state: %s", err)
 			}
 		})
