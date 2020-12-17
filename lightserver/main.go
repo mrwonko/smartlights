@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mrwonko/smartlights/internal/protocol"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -44,9 +45,11 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	sigChan := make(chan os.Signal, 2)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	sigs := []os.Signal{syscall.SIGTERM, syscall.SIGINT}
+	signal.Notify(sigChan, sigs...)
 	go func() {
 		<-sigChan
+		signal.Reset(sigs...)
 		cancel()
 	}()
 
@@ -60,9 +63,13 @@ func main() {
 		}
 	}()
 
+	var eg errgroup.Group
+
 	syncChan := func(ctx context.Context, googleAPIKey, user string) chan<- struct{} {
 		res := make(chan struct{}, 16)
-		go sendSyncRequests(ctx, http.DefaultClient, res, googleAPIKey, user)
+		eg.Go(func() error {
+			return sendSyncRequests(ctx, http.DefaultClient, res, googleAPIKey, user)
+		})
 		return res
 	}(ctx, googleAPIKey, user)
 
@@ -77,7 +84,7 @@ func main() {
 		time.Sleep(time.Second) // allow server to finish starting
 		syncChan <- struct{}{}
 	}(syncChan)
-	go func() {
+	eg.Go(func() error {
 		tokenCache := newAccessTokenCache(http.DefaultClient, googleCreds.privateKey, googleCreds.clientEmail)
 		err := pc.ReceiveState(ctx, func(ctx context.Context, msg *protocol.StateMessage) {
 			if err := reportState(ctx, tokenCache, http.DefaultClient, user); err != nil {
@@ -85,17 +92,17 @@ func main() {
 			}
 		})
 		if err != nil {
-			log.Printf("fatal error receiving states: %s", err)
+			return fmt.Errorf("fatal error receiving states: %w", err)
 		}
-	}()
+		return nil
+	})
 	server := http.Server{
 		Addr:    "127.0.0.1:18917",
 		Handler: mux,
 	}
-	serveErrChan := make(chan error)
-	go func() {
-		serveErrChan <- server.ListenAndServe()
-	}()
+	eg.Go(func() error {
+		return server.ListenAndServe()
+	})
 	<-ctx.Done()
 	log.Printf("shutting down server")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -103,7 +110,7 @@ func main() {
 	if err = server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("failed to shut down server: %s", err)
 	} else {
-		err = <-serveErrChan
+		err = eg.Wait()
 		log.Printf("finished serving with err=%s", err)
 	}
 }

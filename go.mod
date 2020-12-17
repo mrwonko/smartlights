@@ -7,6 +7,7 @@ require (
 	github.com/google/uuid v1.1.1
 	github.com/stianeikeland/go-rpio/v4 v4.4.0
 	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 )
 
 go 1.13

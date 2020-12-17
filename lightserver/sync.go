@@ -4,20 +4,21 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 )
 
-func sendSyncRequests(ctx context.Context, client *http.Client, trigger <-chan struct{}, googleAPIKey, agentUserID string) {
+func sendSyncRequests(ctx context.Context, client *http.Client, trigger <-chan struct{}, googleAPIKey, agentUserID string) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case _, ok := <-trigger:
 			if !ok {
-				return
+				return nil
 			}
 			reqBody, err := json.Marshal(struct {
 				AgentUserID string `json:"agentUserId"`
@@ -25,8 +26,7 @@ func sendSyncRequests(ctx context.Context, client *http.Client, trigger <-chan s
 				AgentUserID: agentUserID,
 			})
 			if err != nil {
-				log.Printf("sync request marshalling failed: %s", err)
-				continue
+				return fmt.Errorf("sync request marshalling failed: %w", err)
 			}
 			req, err := http.NewRequest(http.MethodPost,
 				(&url.URL{
@@ -39,8 +39,7 @@ func sendSyncRequests(ctx context.Context, client *http.Client, trigger <-chan s
 				}).String(),
 				bytes.NewReader(reqBody))
 			if err != nil {
-				log.Printf("sync request creation failed: %s", err)
-				continue
+				return fmt.Errorf("sync request creation failed: %w", err)
 			}
 			resp, err := client.Do(req)
 			if err != nil {
