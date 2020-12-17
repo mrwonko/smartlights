@@ -61,7 +61,6 @@ func newPubsubClient(ctx context.Context) (_ *pubsubClient, finalErr error) {
 	return &res, nil
 }
 
-// TODO: instead of sending individual commands, send a list of them, so we can do one message per device in an execute intent.
 func (pc *pubsubClient) Execute(ctx context.Context, pi int, msg protocol.ExecuteMessage) error {
 	topic := pc.executeTopics[pi]
 	if topic == nil {
