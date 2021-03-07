@@ -158,7 +158,7 @@ func serveFulfillmentExecute(ctx context.Context, pc *pubsubClient, req *request
 		}
 		var errs []error
 		if res.err != nil {
-			errs = []error{err}
+			errs = []error{res.err}
 		}
 		for id := range ids {
 			deviceErrors[id] = append(deviceErrors[id], errs...)
