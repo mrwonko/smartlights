@@ -12,6 +12,7 @@ import (
 
 	"github.com/mrwonko/smartlights/config"
 	"github.com/mrwonko/smartlights/internal/protocol"
+	"github.com/simulatedsimian/joystick"
 
 	rpio "github.com/stianeikeland/go-rpio/v4"
 )
@@ -72,6 +73,10 @@ func main() {
 			}(ctx, pin, c)
 		}
 	}
+	// enable dance mat controls in living room
+	if pi == config.RaspiLight {
+		go danceMatInput(ctx, chans)
+	}
 	wg.Add(1)
 	go func(ctx context.Context, chans map[uint8]chan<- uint8) {
 		err := pc.ReceiveExecute(ctx, func(ctx context.Context, msg *protocol.ExecuteMessage) {
@@ -123,6 +128,84 @@ func main() {
 	wg.Wait()
 	for gpio := range chans {
 		rpio.Pin(gpio).Low()
+	}
+}
+
+func danceMatInput(ctx context.Context, chans map[uint8]chan<- uint8) {
+	const (
+		jsid     = 0
+		pollRate = 10 * time.Millisecond
+		errSleep = 5 * time.Second
+
+		btnUp    = 0b0000000000000001 // also Axis0-
+		btnDown  = 0b0000000000000010 // also Axis1+
+		btnLeft  = 0b0000000000000100 // also Axis1-
+		btnRight = 0b0000000000001000 // also Axis0+
+
+		chanRed   = 17
+		chanGreen = 22
+		chanBlue  = 27
+	)
+	joy, err := joystick.Open(jsid)
+	if err != nil {
+		log.Printf("Failed to open joystick: %s", err)
+		return
+	}
+	type State struct {
+		up    bool
+		down  bool
+		left  bool
+		right bool
+	}
+	type Color struct {
+		red, green, blue uint8
+	}
+	prevState := State{}
+	prevColor := Color{}
+	for {
+		rawState, err := joy.Read()
+		if err != nil {
+			log.Printf("Failed to read joystick: %s", err)
+			return
+		}
+		state := State{
+			up:    rawState.Buttons&btnUp != 0,
+			down:  rawState.Buttons&btnDown != 0,
+			left:  rawState.Buttons&btnLeft != 0,
+			right: rawState.Buttons&btnRight != 0,
+		}
+		color := prevColor
+		if state.left && !prevState.left {
+			color.red = 255 - color.red
+		}
+		if state.up && !prevState.up {
+			color.green = 255 - color.green
+		}
+		if state.right && !prevState.right {
+			color.blue = 255 - color.blue
+		}
+		if state.down && !prevState.down {
+			color.red = 255 - color.red
+			color.green = 255 - color.green
+			color.blue = 255 - color.blue
+		}
+		if color.red != prevColor.red {
+			chans[chanRed] <- color.red
+		}
+		if color.green != prevColor.green {
+			chans[chanGreen] <- color.green
+		}
+		if color.blue != prevColor.blue {
+			chans[chanBlue] <- color.blue
+		}
+		prevColor = color
+		prevState = state
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(pollRate):
+		}
 	}
 }
 

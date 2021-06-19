@@ -18,9 +18,10 @@ const (
 	idLiquorRed
 )
 
+// IDs of the Raspberries
 const (
-	raspiLight        = 0
-	raspiLightKitchen = 1
+	RaspiLight        = 0
+	RaspiLightKitchen = 1
 )
 
 type Light struct {
@@ -33,52 +34,52 @@ type Light struct {
 var Lights = map[ID]*Light{
 	idShelfRed: {
 		Name: "Red Shelf Light",
-		Pi:   raspiLight,
+		Pi:   RaspiLight,
 		GPIO: 17,
 	},
 	idShelfGreen: {
 		Name: "Green Shelf Light",
-		Pi:   raspiLight,
+		Pi:   RaspiLight,
 		GPIO: 22,
 	},
 	idShelfBlue: {
 		Name: "Blue Shelf Light",
-		Pi:   raspiLight,
+		Pi:   RaspiLight,
 		GPIO: 27,
 	},
 	idSofa: {
 		Name: "Journey Light",
-		Pi:   raspiLight,
+		Pi:   RaspiLight,
 		GPIO: 10,
 	},
 	idShoe: {
 		Name: "Shoe Light",
-		Pi:   raspiLight,
+		Pi:   RaspiLight,
 		GPIO: 9,
 	},
 	idLP: {
 		Name: "TV Light",
-		Pi:   raspiLight,
+		Pi:   RaspiLight,
 		GPIO: 4,
 	},
 	idKitchenSink: {
 		Name: "Sink Light",
-		Pi:   raspiLightKitchen,
+		Pi:   RaspiLightKitchen,
 		GPIO: 4,
 	},
 	idLiquorRed: {
 		Name: "Red Liquor Light",
-		Pi:   raspiLightKitchen,
+		Pi:   RaspiLightKitchen,
 		GPIO: 27,
 	},
 	idLiquorGreen: {
 		Name: "Green Liquor Light",
-		Pi:   raspiLightKitchen,
+		Pi:   RaspiLightKitchen,
 		GPIO: 22,
 	},
 	idLiquorBlue: {
 		Name: "Blue Liquor Light",
-		Pi:   raspiLightKitchen,
+		Pi:   RaspiLightKitchen,
 		GPIO: 17,
 	},
 }
