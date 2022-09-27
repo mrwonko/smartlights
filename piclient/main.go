@@ -59,23 +59,26 @@ func main() {
 	}(pc)
 
 	var wg sync.WaitGroup
-	chans := map[uint8]chan<- uint8{}
-	for _, l := range config.Lights {
+	brightnessChans := map[uint8]chan<- uint8{}
+	reportChans := map[uint8]chan<- struct{}{}
+	for id, l := range config.Lights {
 		if l.Pi == pi {
 			c := make(chan uint8, 8)
-			chans[l.GPIO] = c
+			brightnessChans[l.GPIO] = c
+			rc := make(chan struct{}, 8)
+			reportChans[l.GPIO] = rc
 			pin := rpio.Pin(l.GPIO)
 			pin.Output()
 			wg.Add(1)
-			go func(ctx context.Context, pin rpio.Pin, c <-chan uint8) {
-				pwm(ctx, pin, c)
+			go func(ctx context.Context, id config.ID, pin rpio.Pin, c <-chan uint8, rc <-chan struct{}) {
+				pwm(ctx, pc, id, pin, c, rc)
 				wg.Done()
-			}(ctx, pin, c)
+			}(ctx, id, pin, c, rc)
 		}
 	}
 	// enable dance mat controls in living room
 	if pi == config.RaspiLight {
-		go danceMatInput(ctx, chans)
+		go danceMatInput(ctx, brightnessChans)
 	}
 	wg.Add(1)
 	go func(ctx context.Context, chans map[uint8]chan<- uint8) {
@@ -112,21 +115,32 @@ func main() {
 				}
 			}
 			log.Printf("received message %v", msg)
-			err := pc.State(ctx)
-			if err != nil {
-				log.Printf("error reporting state back: %s", err)
-			}
+			// leave reporting back to pwm(), for now
 		})
 		if err != nil {
 			log.Printf("fatal error receiving execute requests: %s", err)
 			cancel()
 		}
 		wg.Done()
-	}(ctx, chans)
+	}(ctx, brightnessChans)
+	wg.Add(1)
+	go func(ctx context.Context, chans map[uint8]chan<- struct{}) {
+		err := pc.ReceiveReport(ctx, func(ctx context.Context) {
+			for _, c := range chans {
+				c <- struct{}{}
+			}
+			log.Println("received report message")
+		})
+		if err != nil {
+			log.Printf("fatal error receiving report requests: %s", err)
+			cancel()
+		}
+		wg.Done()
+	}(ctx, reportChans)
 	log.Println("started listening for messages")
 	<-ctx.Done()
 	wg.Wait()
-	for gpio := range chans {
+	for gpio := range brightnessChans {
 		rpio.Pin(gpio).Low()
 	}
 }
@@ -209,10 +223,20 @@ func danceMatInput(ctx context.Context, chans map[uint8]chan<- uint8) {
 	}
 }
 
-func pwm(ctx context.Context, pin rpio.Pin, cmdChan <-chan uint8) {
+func pwm(ctx context.Context, pc *pubsubClient, id config.ID, pin rpio.Pin, cmdChan <-chan uint8, reportChan <-chan struct{}) {
 	// 50 Hz, each divided into 256 slots -> 12'570 Hz ≈ 20'000 Hz -> 0.05ms
 	const tick = 5 * time.Microsecond
 	brightness := uint8(0)
+	report := func() {
+		err := pc.State(ctx, id, protocol.DeviceStates{
+			OnOff: &protocol.OnOffState{
+				On: brightness > 0, // TODO: dimming
+			},
+		})
+		if err != nil {
+			log.Printf("error reporting state back: %s", err)
+		}
+	}
 	for {
 		if brightness == 0 {
 			pin.Low()
@@ -221,6 +245,10 @@ func pwm(ctx context.Context, pin rpio.Pin, cmdChan <-chan uint8) {
 				return
 			case cmd := <-cmdChan:
 				brightness = cmd
+				report()
+				continue
+			case <-reportChan:
+				report()
 				continue
 			}
 		}
@@ -230,6 +258,10 @@ func pwm(ctx context.Context, pin rpio.Pin, cmdChan <-chan uint8) {
 			return
 		case cmd := <-cmdChan:
 			brightness = cmd
+			report()
+			continue
+		case <-reportChan:
+			report()
 			continue
 		case <-time.After(time.Duration(brightness) * tick):
 		}
@@ -240,6 +272,10 @@ func pwm(ctx context.Context, pin rpio.Pin, cmdChan <-chan uint8) {
 				return
 			case cmd := <-cmdChan:
 				brightness = cmd
+				report()
+				continue
+			case <-reportChan:
+				report()
 				continue
 			case <-time.After(time.Duration(255-brightness) * tick):
 				pin.Low()

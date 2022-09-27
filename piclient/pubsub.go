@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
+	"github.com/mrwonko/smartlights/config"
 	"github.com/mrwonko/smartlights/internal/protocol"
 	"github.com/mrwonko/smartlights/internal/pubsubhelper"
 
@@ -22,6 +24,7 @@ const (
 type pubsubClient struct {
 	client              *pubsub.Client
 	executeSubscription *pubsub.Subscription
+	reportSubscription  *pubsub.Subscription
 	stateTopic          *pubsub.Topic
 }
 
@@ -49,6 +52,11 @@ func newPubsubClient(ctx context.Context, pi int) (_ *pubsubClient, finalErr err
 	if err != nil {
 		return nil, err
 	}
+	name = fmt.Sprintf("report-%d", pi)
+	res.reportSubscription, err = pubsubhelper.GetOrCreateSubscription(ctx, cl, name, name)
+	if err != nil {
+		return nil, err
+	}
 	name = "state"
 	res.stateTopic, err = pubsubhelper.GetOrCreateTopic(ctx, cl, name)
 	if err != nil {
@@ -73,9 +81,22 @@ func (pc *pubsubClient) ReceiveExecute(ctx context.Context, f func(ctx context.C
 	})
 }
 
-func (pc *pubsubClient) State(ctx context.Context) error {
+func (pc *pubsubClient) ReceiveReport(ctx context.Context, f func(ctx context.Context)) error {
+	return pc.reportSubscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+		defer msg.Ack()
+		if msg.PublishTime.Add(discardMessagesAfter).Before(time.Now()) {
+			log.Printf("skipping message due to age: %v", msg)
+			return
+		}
+		f(ctx)
+	})
+}
+
+func (pc *pubsubClient) State(ctx context.Context, id config.ID, states protocol.DeviceStates) error {
 	data, err := json.Marshal(protocol.StateMessage{
-		// TODO
+		Devices: map[string]protocol.DeviceStates{
+			strconv.Itoa(int(id)): states,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("marshalling message: %s", err)

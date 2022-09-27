@@ -19,7 +19,7 @@ import (
 )
 
 // serveFulfillment returns an http.HandlerFunc that handles requests made by Google Home.
-func serveFulfillment(tokenParser authTokenParser, pc *pubsubClient) http.HandlerFunc {
+func serveFulfillment(tokenParser authTokenParser, pc *pubsubClient, sc *stateCache) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		token, status, err := checkFulfillmentAuth(tokenParser, r)
 		if err != nil {
@@ -47,7 +47,7 @@ func serveFulfillment(tokenParser authTokenParser, pc *pubsubClient) http.Handle
 		case intentExecute:
 			serveFulfillmentExecute(r.Context(), pc, req, input, rw)
 		case intentQuery:
-			serveFulfillmentQuery(rw)
+			serveFulfillmentQuery(sc, req, input, rw)
 		default:
 			log.Printf("fulfillment unsupported intent %q", input.Intent)
 			http.Error(rw, "unsupported intent", http.StatusNotImplemented)
@@ -100,11 +100,6 @@ func serveFulfillmentSync(req *request, token *authTokenPayload, rw http.Respons
 func serveFulfillmentDisconnect(rw http.ResponseWriter) {
 	log.Printf("TODO implement disconnect")
 	http.Error(rw, "TODO implement disconnect", http.StatusNotImplemented)
-}
-
-type deviceErr struct {
-	device config.ID
-	err    error
 }
 
 func serveFulfillmentExecute(ctx context.Context, pc *pubsubClient, req *request, input *requestInput, rw http.ResponseWriter) {
@@ -237,7 +232,52 @@ func convertExecuteCommand(ex *requestPayloadExecute) (map[int]protocol.ExecuteM
 	return res, "", nil
 }
 
-func serveFulfillmentQuery(rw http.ResponseWriter) {
-	log.Printf("TODO implement query")
-	http.Error(rw, "TODO implement query", http.StatusNotImplemented)
+func serveFulfillmentQuery(sc *stateCache, req *request, input *requestInput, rw http.ResponseWriter) {
+	// QUERY intent https://developers.google.com/assistant/smarthome/reference/intent/query
+	// requests state of specific devices
+	inputPayload := requestPayloadQuery{}
+	if err := json.Unmarshal(input.Payload, &inputPayload); err != nil {
+		log.Printf("fulfillment query json parse: %s", err)
+		http.Error(rw, "failed to parse body", http.StatusBadRequest)
+		return
+	}
+	log.Printf("fulfiment query request: %v", inputPayload)
+	devices := map[string]map[string]interface{}{}
+	deviceStates := sc.get()
+	for _, cur := range inputPayload.Devices {
+		id := cur.ID
+		if _, ok := devices[id]; ok {
+			// duplicate, already processed
+			continue
+		}
+		states, ok := deviceStates[id]
+		if !ok {
+			// no state cached for this device yet
+			// TODO: we should arguably query proactively in this case?
+			devices[id] = map[string]interface{}{
+				"online": false,
+				"status": "OFFLINE",
+			}
+			continue
+		}
+		dev := map[string]interface{}{
+			"online": true,
+			"status": "SUCCESS",
+		}
+		if states.OnOff != nil {
+			dev[string(stateOn)] = states.OnOff.On
+		}
+		devices[id] = dev
+	}
+	payload := responsePayloadQuery{
+		Devices: devices,
+	}
+	if err := json.NewEncoder(io.MultiWriter(rw, os.Stderr)).Encode(response{
+		RequestID: req.RequestID,
+		Payload:   payload,
+	}); err != nil {
+		log.Printf("fulfillment query send response: %s", err)
+		return
+	}
+	log.Printf("successful query")
 }

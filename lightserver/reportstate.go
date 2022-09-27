@@ -16,29 +16,76 @@ import (
 
 	jwt "github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
+	"github.com/mrwonko/smartlights/internal/protocol"
 )
 
 const (
 	expiryGracePeriod = 10 * time.Second
 )
 
+type stateCache struct {
+	mu         sync.RWMutex
+	lastStates map[string]protocol.DeviceStates // keep states immutable to enable safe shallow copies
+}
+
+func (sc *stateCache) update(updates map[string]protocol.DeviceStates) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	if sc.lastStates == nil {
+		sc.lastStates = map[string]protocol.DeviceStates{}
+	}
+	for id, up := range updates {
+		cur := sc.lastStates[id]
+		if up.OnOff != nil {
+			cur.OnOff = &protocol.OnOffState{On: up.OnOff.On}
+		}
+		sc.lastStates[id] = cur
+	}
+}
+
+func (sc *stateCache) get() map[string]protocol.DeviceStates {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	res := map[string]protocol.DeviceStates{}
+	for id, states := range sc.lastStates {
+		res[id] = states // states ought to be immutable, so no need to deep copy
+	}
+	return res
+}
+
 // reportState implements https://developers.google.com/assistant/smarthome/develop/report-state
-func reportState(ctx context.Context, tokenCache *accessTokenCache, client *http.Client, agentUserID string) error { // TODO: state
+func reportState(ctx context.Context, tokenCache *accessTokenCache, client *http.Client, agentUserID string, msg *protocol.StateMessage) error {
 	accessToken, err := tokenCache.getToken(ctx)
 	if err != nil {
 		return fmt.Errorf("fetching access token: %w", err)
 	}
 
-	reqBody, err := json.Marshal(struct {
-		RequestID   string              `json:"requestId"`
-		AgentUserID string              `json:"agentUserId"`
-		Payload     requestPayloadState `json:"payload"`
-	}{
-		RequestID:   uuid.New().String(), // TODO
-		AgentUserID: agentUserID,
-		Payload:     requestPayloadState{
-			// TODO
+	statesByDevice := map[string]requestPayloadReportDeviceStates{}
+	for id, states := range msg.Devices {
+		dev := statesByDevice[id]
+		if dev == nil {
+			dev = requestPayloadReportDeviceStates{}
+			statesByDevice[id] = dev
+		}
+		if states.OnOff != nil {
+			dev[stateOn] = states.OnOff.On
+		}
+	}
+
+	payload := requestPayloadReport{
+		Devices: requestPayloadReportDevice{
+			States: statesByDevice,
 		},
+	}
+
+	reqBody, err := json.Marshal(struct {
+		RequestID   string               `json:"requestId"`
+		AgentUserID string               `json:"agentUserId"`
+		Payload     requestPayloadReport `json:"payload"`
+	}{
+		RequestID:   uuid.New().String(),
+		AgentUserID: agentUserID,
+		Payload:     payload,
 	})
 	if err != nil {
 		return fmt.Errorf("request marshalling failed: %w", err)

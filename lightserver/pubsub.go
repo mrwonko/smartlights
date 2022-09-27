@@ -17,8 +17,10 @@ import (
 )
 
 type pubsubClient struct {
-	client            *pubsub.Client
-	executeTopics     map[int]*pubsub.Topic
+	client *pubsub.Client
+	// TODO: combine into perPiTopics?
+	executeTopics     map[int]*pubsub.Topic // commands to change device state
+	reportTopics      map[int]*pubsub.Topic // request a device state report (to initialise state cache)
 	stateSubscription *pubsub.Subscription
 }
 
@@ -45,10 +47,16 @@ func newPubsubClient(ctx context.Context) (_ *pubsubClient, finalErr error) {
 	res := pubsubClient{
 		client:        cl,
 		executeTopics: make(map[int]*pubsub.Topic, len(config.Pis)),
+		reportTopics:  make(map[int]*pubsub.Topic, len(config.Pis)),
 	}
 	for pi := range config.Pis {
 		name := fmt.Sprintf("execute-%d", pi)
 		res.executeTopics[pi], err = pubsubhelper.GetOrCreateTopic(ctx, cl, name)
+		if err != nil {
+			return nil, err
+		}
+		name = fmt.Sprintf("report-%d", pi)
+		res.reportTopics[pi], err = pubsubhelper.GetOrCreateTopic(ctx, cl, name)
 		if err != nil {
 			return nil, err
 		}
@@ -72,6 +80,19 @@ func (pc *pubsubClient) Execute(ctx context.Context, pi int, msg protocol.Execut
 	}
 	_, err = topic.Publish(ctx, &pubsub.Message{
 		Data: data,
+	}).Get(ctx)
+	return err
+}
+
+func (pc *pubsubClient) Report(ctx context.Context, pi int, reason string) error {
+	topic := pc.reportTopics[pi]
+	if topic == nil {
+		return fmt.Errorf("invalid pi %d", pi)
+	}
+	_, err := topic.Publish(ctx, &pubsub.Message{
+		Attributes: map[string]string{
+			"reason": reason,
+		},
 	}).Get(ctx)
 	return err
 }

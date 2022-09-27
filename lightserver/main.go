@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mrwonko/smartlights/config"
 	"github.com/mrwonko/smartlights/internal/protocol"
 	"golang.org/x/sync/errgroup"
 )
@@ -73,11 +74,12 @@ func main() {
 		return res
 	}(ctx, googleAPIKey, user)
 
+	sc := new(stateCache)
 	mux := http.NewServeMux()
 
 	mux.HandleFunc(loginPath, oauthServer.serveLogin)
 	mux.HandleFunc(tokenPath, oauthServer.serveToken)
-	mux.HandleFunc("/smartlights/fulfillment", serveFulfillment(oauthServer, pc))
+	mux.HandleFunc("/smartlights/fulfillment", serveFulfillment(oauthServer, pc, sc))
 
 	log.Println("setup successful, starting to listen & requesting sync")
 	go func(syncChan chan<- struct{}) {
@@ -87,7 +89,8 @@ func main() {
 	eg.Go(func() error {
 		tokenCache := newAccessTokenCache(http.DefaultClient, googleCreds.privateKey, googleCreds.clientEmail)
 		err := pc.ReceiveState(ctx, func(ctx context.Context, msg *protocol.StateMessage) {
-			if err := reportState(ctx, tokenCache, http.DefaultClient, user); err != nil {
+			sc.update(msg.Devices)
+			if err := reportState(ctx, tokenCache, http.DefaultClient, user, msg); err != nil {
 				log.Printf("error reporting state: %s", err)
 			}
 		})
@@ -103,6 +106,15 @@ func main() {
 	eg.Go(func() error {
 		return server.ListenAndServe()
 	})
+	// upon opening the app, Google sends a query to initialise its home graph.
+	// at that point, our stateCache is still empty, and it does not support lazy loading (yet?)
+	// so we request a full report from all devices on startup to fill the cache for the later query
+	// (we could also implement proper querying instead of abusing caching...)
+	for pi := range config.Pis {
+		if err := pc.Report(ctx, pi, "init"); err != nil {
+			log.Printf("failed to request initial state report from pi %d: %s", pi, err)
+		}
+	}
 	<-ctx.Done()
 	log.Printf("shutting down server")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

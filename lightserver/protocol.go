@@ -18,8 +18,6 @@ type (
 		Payload json.RawMessage `json:"payload"` // type depends on intent
 	}
 
-	requestIntent string
-
 	requestPayloadQuery struct {
 		Devices []struct {
 			ID string `json:"id"`
@@ -87,12 +85,16 @@ type (
 		States map[string]interface{} `json:"states,omitempty"`
 	}
 
-	requestPayloadState struct {
-		// TODO
+	requestPayloadReport struct {
+		Devices requestPayloadReportDevice `json:"devices"`
 	}
+	requestPayloadReportDevice struct {
+		States map[string]requestPayloadReportDeviceStates `json:"states"` // device id
+	}
+	requestPayloadReportDeviceStates map[deviceState]interface{}
 )
 
-type deviceType string
+type requestIntent string
 
 const (
 	intentSync       requestIntent = "action.devices.SYNC"
@@ -101,7 +103,7 @@ const (
 	intentDisconnect requestIntent = "action.devices.DISCONNECT"
 )
 
-type deviceTrait string
+type deviceType string
 
 const (
 	typeLight deviceType = "action.devices.types.LIGHT"
@@ -130,11 +132,22 @@ const (
 	// full list at https://developers.google.com/actions/reference/smarthome/errors-exceptions
 )
 
+type deviceTrait string
+
 const (
 	traitBrightness   deviceTrait = "action.devices.traits.Brightness"
-	traitColorSetting deviceTrait = "action.devices.traits.ColorSetting"
+	traitColorSetting deviceTrait = "action.devices.traits.ColorSetting" // https://developers.google.com/assistant/smarthome/traits/colorsetting
 	traitOnOff        deviceTrait = "action.devices.traits.OnOff"
-	traitToggles      deviceTrait = "action.devices.traits.Toggles"
+)
+
+type deviceState string // keys used to report state
+const (
+	// Brightness
+	stateBrightness deviceState = "brightness" // int 0-100
+	// ColorSetting
+	stateColor deviceState = "color" // context-specific struct, probably RGB for us?
+	// OnOff
+	stateOn deviceState = "on"
 )
 
 var devices = func() []responsePayloadSyncDevice {
@@ -147,10 +160,8 @@ var devices = func() []responsePayloadSyncDevice {
 		d.Name.Name = light.Name
 		d.Type = typeLight
 		d.Traits = []deviceTrait{traitOnOff}
-		d.WillReportState = false // TODO report state
-		d.Attributes = map[string]interface{}{
-			"commandOnlyOnOff": true, // TODO report state
-		}
+		d.WillReportState = true
+		d.Attributes = map[string]interface{}{}
 	}
 	return res
 }()
