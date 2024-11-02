@@ -2,6 +2,7 @@
 set -eu -o pipefail
 
 export GOOS=linux
+export CGO_ENABLED=0
 
 go build -o bin/lightserver ./lightserver/
 
