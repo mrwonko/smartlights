@@ -47,7 +47,7 @@ func serveFulfillment(tokenParser authTokenParser, pc *pubsubClient, sc *stateCa
 		case intentExecute:
 			serveFulfillmentExecute(r.Context(), pc, req, input, rw)
 		case intentQuery:
-			serveFulfillmentQuery(sc, req, input, rw)
+			serveFulfillmentQuery(r.Context(), sc, req, input, pc.Report, rw)
 		default:
 			log.Printf("fulfillment unsupported intent %q", input.Intent)
 			http.Error(rw, "unsupported intent", http.StatusNotImplemented)
@@ -232,7 +232,7 @@ func convertExecuteCommand(ex *requestPayloadExecute) (map[int]protocol.ExecuteM
 	return res, "", nil
 }
 
-func serveFulfillmentQuery(sc *stateCache, req *request, input *requestInput, rw http.ResponseWriter) {
+func serveFulfillmentQuery(ctx context.Context, sc *stateCache, req *request, input *requestInput, requestReport func(ctx context.Context, pi int, reason string) error, rw http.ResponseWriter) {
 	// QUERY intent https://developers.google.com/assistant/smarthome/reference/intent/query
 	// requests state of specific devices
 	inputPayload := requestPayloadQuery{}
@@ -244,6 +244,7 @@ func serveFulfillmentQuery(sc *stateCache, req *request, input *requestInput, rw
 	log.Printf("fulfiment query request: %v", inputPayload)
 	devices := map[string]map[string]interface{}{}
 	deviceStates := sc.get()
+	reportsRequestedFromPis := map[int]struct{}{}
 	for _, cur := range inputPayload.Devices {
 		id := cur.ID
 		if _, ok := devices[id]; ok {
@@ -253,7 +254,18 @@ func serveFulfillmentQuery(sc *stateCache, req *request, input *requestInput, rw
 		states, ok := deviceStates[id]
 		if !ok {
 			// no state cached for this device yet
-			// TODO: we should arguably query proactively in this case?
+			// request a report, but for now, report as offline
+			parsedID, err := strconv.Atoi(id)
+			if err != nil {
+				log.Printf("received query for non-int device %q", id)
+			} else if light, ok := config.Lights[config.ID(parsedID)]; !ok {
+				log.Printf("received query for unknown device %d", parsedID)
+			} else if _, requested := reportsRequestedFromPis[light.Pi]; !requested {
+				if err := requestReport(ctx, light.Pi, "query"); err != nil {
+					log.Printf("failed to request report from pi %d: %s", light.Pi, err)
+				}
+				reportsRequestedFromPis[light.Pi] = struct{}{}
+			}
 			devices[id] = map[string]interface{}{
 				"online": false,
 				"status": "OFFLINE",
