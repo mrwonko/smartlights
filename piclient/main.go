@@ -76,6 +76,11 @@ func main() {
 			}(ctx, id, pin, c, rc)
 		}
 	}
+	report := func() {
+		for _, c := range reportChans {
+			c <- struct{}{}
+		}
+	}
 	// enable dance mat controls in living room
 	if pi == config.RaspiLight {
 		go danceMatInput(ctx, brightnessChans)
@@ -124,11 +129,9 @@ func main() {
 		wg.Done()
 	}(ctx, brightnessChans)
 	wg.Add(1)
-	go func(ctx context.Context, chans map[uint8]chan<- struct{}) {
+	go func(ctx context.Context, report func()) {
 		err := pc.ReceiveReport(ctx, func(ctx context.Context) {
-			for _, c := range chans {
-				c <- struct{}{}
-			}
+			report()
 			log.Println("received report message")
 		})
 		if err != nil {
@@ -136,8 +139,10 @@ func main() {
 			cancel()
 		}
 		wg.Done()
-	}(ctx, reportChans)
+	}(ctx, report)
 	log.Println("started listening for messages")
+	// send a proactive report to refresh the server's cached state
+	report()
 	<-ctx.Done()
 	wg.Wait()
 	for gpio := range brightnessChans {
