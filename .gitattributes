@@ -1,0 +1,2 @@
+# ensure shell scripts don't get CRLF newlines
+*.sh text eol=lf
